@@ -251,10 +251,18 @@ jobs:
                       f"- Buenas practicas y recomendaciones de seguridad.\n\n" \
                       f"IMPORTANTE: Revisar la documentacion y esquemas de trabajo antes de las practicas."
 
-          # ── Funciones de estilo para generar LaTeX bonito ─────────────────────
+          # ── Funciones de estilo y estructura de TXT para LaTeX ────────────────
           TITULOS_LETRAS = ["A", "B", "C", "D", "F", "G", "H", "I", "K", "L", "M", "N", "Q"]
-          TITULOS_DOS_ARGS = {"A", "B", "G"}
+          TITULOS_SOLO = ["C", "D", "F", "H", "I", "K", "L", "M", "N", "Q"]
+          TITULOS_CON_SUB = ["A", "B", "G"]
+          PALETAS_MAP = {
+              "OCEANO": r"\paletaOceano",
+              "BOSQUE": r"\paletaBosque",
+              "CORAL": r"\paletaCoral",
+              "LAVANDA": r"\paletaLavanda"
+          }
           PALETAS = [r"\paletaOceano", r"\paletaBosque", r"\paletaCoral", r"\paletaLavanda"]
+          VINETAS = ["estrellalist", "bulletlist", "flechalist", "marcalist"]
 
           def escape_latex(s):
               reps = [
@@ -266,32 +274,86 @@ jobs:
                   s = s.replace(old, new)
               return s
 
-          import random
-          VINETAS = ["estrellalist", "bulletlist", "flechalist", "marcalist"]
+          def format_inline(s):
+              s = escape_latex(s)
+              s = re.sub(r"\*\*(.+?)\*\*", r"\\textbf{\1}", s)
+              s = re.sub(r"\*(.+?)\*", r"\\textit{\1}", s)
+              return s
 
-          def construir_titulo(titulo, subtitulo=""):
-              letra = random.choice(TITULOS_LETRAS)
-              tit_esc = escape_latex(titulo)
-              if letra in TITULOS_DOS_ARGS:
-                  sub_esc = escape_latex(subtitulo or "Guia de Conceptos y Practica")
-                  return f"\\titulo{letra}{{{tit_esc}}}{{{sub_esc}}}"
-              return f"\\titulo{letra}{{{tit_esc}}}"
+          # ── Parsear metadatos opcionales del TXT ──────────────────────────────
+          raw_lines = [l.rstrip() for l in texto.splitlines()]
+          titulo_txt = nombre_limpio.replace("APUNTE_", "").replace("_", " ").strip()
+          subtitulo_txt = ""
+          paleta_txt = None
+          estilo_txt = None
 
-          titulo_documento = nombre_limpio.replace("APUNTE_", "").replace("_", " ").strip()
-          grado_legible = GRADO.replace("_", " ")
+          body_lines = []
+          in_meta = True
 
-          # Selección aleatoria de paleta y título estilizado
-          paleta_cmd = random.choice(PALETAS)
-          comando_titulo = construir_titulo(titulo_documento, f"Grado: {grado_legible}")
+          for l in raw_lines:
+              l_s = l.strip()
+              if in_meta:
+                  if not l_s:
+                      continue
+                  m = re.match(r"^TITULO:\s*(.+)$", l_s, re.IGNORECASE)
+                  if m:
+                      titulo_txt = m.group(1).strip()
+                      continue
+                  m = re.match(r"^SUBTITULO:\s*(.+)$", l_s, re.IGNORECASE)
+                  if m:
+                      subtitulo_txt = m.group(1).strip()
+                      continue
+                  m = re.match(r"^PALETA:\s*(.+)$", l_s, re.IGNORECASE)
+                  if m:
+                      paleta_txt = m.group(1).strip().upper()
+                      continue
+                  m = re.match(r"^(?:ESTILO|ESTILO_TITULO):\s*([A-Za-z])$", l_s, re.IGNORECASE)
+                  if m:
+                      estilo_txt = m.group(1).upper()
+                      continue
+                  in_meta = False
+              body_lines.append(l_s)
 
-          # Procesar líneas de contenido
-          lineas = [l.strip() for l in texto.splitlines() if l.strip()][:300]
+          # Paleta
+          if paleta_txt and paleta_txt in PALETAS_MAP:
+              paleta_cmd = PALETAS_MAP[paleta_txt]
+          else:
+              paleta_cmd = random.choice(PALETAS)
+
+          # Estilo de título
+          if estilo_txt and estilo_txt in TITULOS_LETRAS:
+              letra = estilo_txt
+          elif subtitulo_txt:
+              letra = random.choice(TITULOS_CON_SUB + TITULOS_SOLO)
+          else:
+              letra = random.choice(TITULOS_SOLO)
+
+          tit_esc = escape_latex(titulo_txt)
+          sub_esc = escape_latex(subtitulo_txt)
+
+          if letra in TITULOS_CON_SUB:
+              comando_titulo = f"\\titulo{letra}{{{tit_esc}}}{{{sub_esc or 'Guía de Estudio'}}}"
+              bloque_subtitulo = ""
+          else:
+              comando_titulo = f"\\titulo{letra}{{{tit_esc}}}"
+              if subtitulo_txt:
+                  bloque_subtitulo = f"\n\\vspace{{1mm}}\n\\begin{{center}}\\large\\textcolor{{gray}}{{{sub_esc}}}\\end{{center}}\n\\vspace{{4mm}}\n"
+              else:
+                  bloque_subtitulo = ""
+
+          # ── Procesar líneas de contenido ─────────────────────────────────────
           cuerpo = []
           en_lista = False
           vineta_actual = "estrellalist"
           en_codigo = False
 
-          for l_str in lineas:
+          for l_str in body_lines[:350]:
+              if not l_str:
+                  if en_lista:
+                      cuerpo.append(rf"\end{{{vineta_actual}}}")
+                      en_lista = False
+                  continue
+
               if l_str.startswith("```"):
                   if en_lista:
                       cuerpo.append(rf"\end{{{vineta_actual}}}")
@@ -308,48 +370,82 @@ jobs:
                   cuerpo.append(l_str)
                   continue
 
-              # Secciones
+              # Sección principal
               sec_m = re.match(r"^(?:SECCION:|TEMA\s+\d+:?|UNIDAD\s+\d+:?|\d+\.\s+)(.+)$", l_str, re.IGNORECASE)
               if sec_m:
                   if en_lista:
                       cuerpo.append(rf"\end{{{vineta_actual}}}")
                       en_lista = False
-                  tit_sec = escape_latex(sec_m.group(1).strip())
+                  tit_sec = format_inline(sec_m.group(1).strip())
                   cuerpo.append(f"\n\\vspace{{4mm}}\n\\sectionheader{{2.6cm}}{{{tit_sec}}}\n\\vspace{{4mm}}\n")
                   continue
 
-              # Callouts / Notas importantes con estilos de caja aleatorios
-              tip_m = re.match(r"^(?:NOTA|CONSEJO|IMPORTANTE|AVISO|RECUERDA):\s*(.+)$", l_str, re.IGNORECASE)
-              if tip_m:
+              # Subsección
+              subsec_m = re.match(r"^(?:SUBSECCION:|\d+\.\d+\.?\s+)(.+)$", l_str, re.IGNORECASE)
+              if subsec_m:
                   if en_lista:
                       cuerpo.append(rf"\end{{{vineta_actual}}}")
                       en_lista = False
-                  txt_tip = escape_latex(tip_m.group(1).strip())
-                  estilo_caja = random.choice(["tipbox", "infobox", "highlightpar"])
-                  if estilo_caja == "tipbox":
-                      cuerpo.append(f"\n\\begin{{tipbox}}[accent]{{Punto Clave}}{{{txt_tip}}}\n\\end{{tipbox}}\n")
-                  elif estilo_caja == "infobox":
-                      cuerpo.append(f"\n\\infobox{{{txt_tip}}}\n")
-                  else:
-                      cuerpo.append(f"\n\\highlightpar{{{txt_tip}}}\n")
+                  tit_sub = format_inline(subsec_m.group(1).strip())
+                  cuerpo.append(f"\n\\vspace{{3mm}}\n\\noindent{{\\headingfontxb\\fontsize{{13}}{{16}}\\selectfont\\color{{primary}} {tit_sub}}}\\par\\vspace{{2mm}}\n")
                   continue
 
-              # Elementos de lista con viñeta aleatoria por cada lista
+              # Callouts y cajas temáticas
+              imp_m = re.match(r"^(?:IMPORTANTE|AVISO|ALERTA):\s*(.+)$", l_str, re.IGNORECASE)
+              if imp_m:
+                  if en_lista:
+                      cuerpo.append(rf"\end{{{vineta_actual}}}")
+                      en_lista = False
+                  cuerpo.append(f"\n\\begin{{tipbox}}[accent]{{Importante}}{{{format_inline(imp_m.group(1).strip())}}}\n\\end{{tipbox}}\n")
+                  continue
+
+              con_m = re.match(r"^(?:CONSEJO|TIP|RECUERDA):\s*(.+)$", l_str, re.IGNORECASE)
+              if con_m:
+                  if en_lista:
+                      cuerpo.append(rf"\end{{{vineta_actual}}}")
+                      en_lista = False
+                  cuerpo.append(f"\n\\begin{{tipbox}}[primary]{{Consejo}}{{{format_inline(con_m.group(1).strip())}}}\n\\end{{tipbox}}\n")
+                  continue
+
+              nota_m = re.match(r"^NOTA:\s*(.+)$", l_str, re.IGNORECASE)
+              if nota_m:
+                  if en_lista:
+                      cuerpo.append(rf"\end{{{vineta_actual}}}")
+                      en_lista = False
+                  cuerpo.append(f"\n\\infobox{{\\textbf{{Nota: }} {format_inline(nota_m.group(1).strip())}}}\n")
+                  continue
+
+              ejem_m = re.match(r"^(?:EJEMPLO|CASO):\s*(.+)$", l_str, re.IGNORECASE)
+              if ejem_m:
+                  if en_lista:
+                      cuerpo.append(rf"\end{{{vineta_actual}}}")
+                      en_lista = False
+                  cuerpo.append(f"\n\\begin{{infobox}}[tertiary]{{\\textbf{{Ejemplo: }} {format_inline(ejem_m.group(1).strip())}}}\\end{{infobox}}\n")
+                  continue
+
+              res_m = re.match(r"^(?:RESUMEN|CONCLUSION):\s*(.+)$", l_str, re.IGNORECASE)
+              if res_m:
+                  if en_lista:
+                      cuerpo.append(rf"\end{{{vineta_actual}}}")
+                      en_lista = False
+                  cuerpo.append(f"\n\\begin{{highlightpar}}[pale]{{\\textbf{{Resumen: }} {format_inline(res_m.group(1).strip())}}}\\end{{highlightpar}}\n")
+                  continue
+
+              # Elementos de lista
               list_m = re.match(r"^[-*•]\s*(.+)$", l_str)
               if list_m:
                   if not en_lista:
                       vineta_actual = random.choice(VINETAS)
                       cuerpo.append(rf"\begin{{{vineta_actual}}}")
                       en_lista = True
-                  item_txt = escape_latex(list_m.group(1).strip())
-                  cuerpo.append(f"  \\item {item_txt}")
+                  cuerpo.append(f"  \\item {format_inline(list_m.group(1).strip())}")
                   continue
               else:
                   if en_lista:
                       cuerpo.append(rf"\end{{{vineta_actual}}}")
                       en_lista = False
 
-              cuerpo.append(f"{escape_latex(l_str)}\\par\n")
+              cuerpo.append(f"{format_inline(l_str)}\\par\n")
 
           if en_lista:
               cuerpo.append(rf"\end{{{vineta_actual}}}")
@@ -372,7 +468,8 @@ jobs:
           \definecolor{primary}{HTML}{2563EB}
           \definecolor{ink}{HTML}{1F2937}"""
               paleta_cmd = ""
-              comando_titulo = rf"\begin{{center}}{{\huge\bfseries\color{{primary}} {escape_latex(titulo_documento)}}}\end{{center}}"
+              comando_titulo = rf"\begin{{center}}{{\huge\bfseries\color{{primary}} {escape_latex(titulo_txt)}}}\end{{center}}"
+              bloque_subtitulo = ""
 
           tex_documento = rf"""\documentclass[12pt,a4paper]{{article}}
           {encabezado_estilo}
@@ -380,10 +477,7 @@ jobs:
           \begin{{document}}
           {paleta_cmd}
           {comando_titulo}
-          \vspace{{1mm}}
-          \begin{{center}}\large\textcolor{{gray}}{{Grado: {escape_latex(grado_legible)} | Apunte de Estudio}}\end{{center}}
-          \vspace{{4mm}}
-
+          {bloque_subtitulo}
           {cuerpo_tex}
 
           \end{{document}}
