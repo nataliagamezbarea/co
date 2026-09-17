@@ -266,9 +266,11 @@ jobs:
                   s = s.replace(old, new)
               return s
 
+          import random
+          VINETAS = ["estrellalist", "bulletlist", "flechalist", "marcalist"]
+
           def construir_titulo(titulo, subtitulo=""):
-              idx = int(hashlib.md5(titulo.encode("utf-8")).hexdigest(), 16) % len(TITULOS_LETRAS)
-              letra = TITULOS_LETRAS[idx]
+              letra = random.choice(TITULOS_LETRAS)
               tit_esc = escape_latex(titulo)
               if letra in TITULOS_DOS_ARGS:
                   sub_esc = escape_latex(subtitulo or "Guia de Conceptos y Practica")
@@ -278,21 +280,21 @@ jobs:
           titulo_documento = nombre_limpio.replace("APUNTE_", "").replace("_", " ").strip()
           grado_legible = GRADO.replace("_", " ")
 
-          # Selección determinista de título y paleta
-          idx_paleta = int(hashlib.md5((titulo_documento + GRADO).encode("utf-8")).hexdigest(), 16) % len(PALETAS)
-          paleta_cmd = PALETAS[idx_paleta]
+          # Selección aleatoria de paleta y título estilizado
+          paleta_cmd = random.choice(PALETAS)
           comando_titulo = construir_titulo(titulo_documento, f"Grado: {grado_legible}")
 
           # Procesar líneas de contenido
           lineas = [l.strip() for l in texto.splitlines() if l.strip()][:300]
           cuerpo = []
           en_lista = False
+          vineta_actual = "estrellalist"
           en_codigo = False
 
           for l_str in lineas:
               if l_str.startswith("```"):
                   if en_lista:
-                      cuerpo.append(r"\end{estrellalist}")
+                      cuerpo.append(rf"\end{{{vineta_actual}}}")
                       en_lista = False
                   if en_codigo:
                       cuerpo.append(r"\end{verbatim}")
@@ -310,43 +312,51 @@ jobs:
               sec_m = re.match(r"^(?:SECCION:|TEMA\s+\d+:?|UNIDAD\s+\d+:?|\d+\.\s+)(.+)$", l_str, re.IGNORECASE)
               if sec_m:
                   if en_lista:
-                      cuerpo.append(r"\end{estrellalist}")
+                      cuerpo.append(rf"\end{{{vineta_actual}}}")
                       en_lista = False
                   tit_sec = escape_latex(sec_m.group(1).strip())
                   cuerpo.append(f"\n\\vspace{{4mm}}\n\\sectionheader{{2.6cm}}{{{tit_sec}}}\n\\vspace{{4mm}}\n")
                   continue
 
-              # Callouts / Notas importantes
+              # Callouts / Notas importantes con estilos de caja aleatorios
               tip_m = re.match(r"^(?:NOTA|CONSEJO|IMPORTANTE|AVISO|RECUERDA):\s*(.+)$", l_str, re.IGNORECASE)
               if tip_m:
                   if en_lista:
-                      cuerpo.append(r"\end{estrellalist}")
+                      cuerpo.append(rf"\end{{{vineta_actual}}}")
                       en_lista = False
                   txt_tip = escape_latex(tip_m.group(1).strip())
-                  cuerpo.append(f"\n\\begin{{tipbox}}[accent]{{Punto Clave}}{{{txt_tip}}}\n\\end{{tipbox}}\n")
+                  estilo_caja = random.choice(["tipbox", "infobox", "highlightpar"])
+                  if estilo_caja == "tipbox":
+                      cuerpo.append(f"\n\\begin{{tipbox}}[accent]{{Punto Clave}}{{{txt_tip}}}\n\\end{{tipbox}}\n")
+                  elif estilo_caja == "infobox":
+                      cuerpo.append(f"\n\\infobox{{{txt_tip}}}\n")
+                  else:
+                      cuerpo.append(f"\n\\highlightpar{{{txt_tip}}}\n")
                   continue
 
-              # Elementos de lista
+              # Elementos de lista con viñeta aleatoria por cada lista
               list_m = re.match(r"^[-*•]\s*(.+)$", l_str)
               if list_m:
                   if not en_lista:
-                      cuerpo.append(r"\begin{estrellalist}")
+                      vineta_actual = random.choice(VINETAS)
+                      cuerpo.append(rf"\begin{{{vineta_actual}}}")
                       en_lista = True
                   item_txt = escape_latex(list_m.group(1).strip())
                   cuerpo.append(f"  \\item {item_txt}")
                   continue
               else:
                   if en_lista:
-                      cuerpo.append(r"\end{estrellalist}")
+                      cuerpo.append(rf"\end{{{vineta_actual}}}")
                       en_lista = False
 
               cuerpo.append(f"{escape_latex(l_str)}\\par\n")
 
           if en_lista:
-              cuerpo.append(r"\end{estrellalist}")
+              cuerpo.append(rf"\end{{{vineta_actual}}}")
           if en_codigo:
               cuerpo.append(r"\end{verbatim}")
 
+          cuerpo.append("\n\\vspace{4mm}\n\\closingbars\n")
           cuerpo_tex = "\n".join(cuerpo)
 
           # Verificar disponibilidad de estilo.tex
