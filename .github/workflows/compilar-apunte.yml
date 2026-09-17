@@ -327,11 +327,12 @@ jobs:
                   continue
 
               # Elementos de lista
-              if l_str.startswith("- ") or l_str.startswith("* ") or l_str.startswith("• "):
+              list_m = re.match(r"^[-*•]\s*(.+)$", l_str)
+              if list_m:
                   if not en_lista:
                       cuerpo.append(r"\begin{estrellalist}")
                       en_lista = True
-                  item_txt = escape_latex(re.sub(r"^[-*•]\s*", "", l_str))
+                  item_txt = escape_latex(list_m.group(1).strip())
                   cuerpo.append(f"  \\item {item_txt}")
                   continue
               else:
