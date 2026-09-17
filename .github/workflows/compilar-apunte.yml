@@ -53,8 +53,8 @@ jobs:
           pip install pymupdf --quiet
           fc-cache -f
 
-      - name: Compilar apunte LaTeX con titulos y estilo de bibliotecas_latex
-        env:
+          - name: Compilar apunte LaTeX con titulos y estilo de bibliotecas_latex
+          env:
           GH_TOKEN_GENERAL: ${{ github.event.inputs.gh_token || secrets.GH_TOKEN_GENERAL || secrets.GITHUB_TOKEN }}
           GH_REPO_GENERAL: ${{ github.event.inputs.repo_general }}
           INPUT_GRADO: ${{ github.event.inputs.grado }}
@@ -352,32 +352,32 @@ jobs:
           estilo_file = bib_dst / "estilo.tex"
           if estilo_file.exists():
               encabezado_estilo = r"""\input{bibliotecas_latex/estilo.tex}
-\usarfondo"""
+          \usarfondo"""
           else:
               encabezado_estilo = r"""\usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
-\usepackage[spanish]{babel}
-\usepackage[a4paper,margin=2cm]{geometry}
-\usepackage{xcolor,parskip}
-\definecolor{primary}{HTML}{2563EB}
-\definecolor{ink}{HTML}{1F2937}"""
+          \usepackage[T1]{fontenc}
+          \usepackage[spanish]{babel}
+          \usepackage[a4paper,margin=2cm]{geometry}
+          \usepackage{xcolor,parskip}
+          \definecolor{primary}{HTML}{2563EB}
+          \definecolor{ink}{HTML}{1F2937}"""
               paleta_cmd = ""
               comando_titulo = rf"\begin{{center}}{{\huge\bfseries\color{{primary}} {escape_latex(titulo_documento)}}}\end{{center}}"
 
           tex_documento = rf"""\documentclass[12pt,a4paper]{{article}}
-{encabezado_estilo}
+          {encabezado_estilo}
 
-\begin{{document}}
-{paleta_cmd}
-{comando_titulo}
-\vspace{{1mm}}
-\begin{{center}}\large\textcolor{{gray}}{{Grado: {escape_latex(grado_legible)} | Apunte de Estudio}}\end{{center}}
-\vspace{{4mm}}
+          \begin{{document}}
+          {paleta_cmd}
+          {comando_titulo}
+          \vspace{{1mm}}
+          \begin{{center}}\large\textcolor{{gray}}{{Grado: {escape_latex(grado_legible)} | Apunte de Estudio}}\end{{center}}
+          \vspace{{4mm}}
 
-{cuerpo_tex}
+          {cuerpo_tex}
 
-\end{{document}}
-"""
+          \end{{document}}
+          """
 
           tex_path = workdir / f"{nombre_limpio}.tex"
           tex_path.write_text(tex_documento, encoding="utf-8")
