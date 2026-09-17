@@ -1,0 +1,678 @@
+% =====================================================================
+%  ESTILO.TEX — LIBRERÍA DE APUNTES (multi-tema, multi-color)
+% =====================================================================
+%  CÓMO FUNCIONA (para reutilizar sin que todo salga igual):
+%   1) Al principio de cada página / sección llama a UNA paleta:
+%        \paletaBosque   \paletaCoral   \paletaLavanda   \paletaOceano
+%      Esto redefine los colores "primary / secondary / tertiary /
+%      pale / accent / ink" que usan TODOS los bloques.
+%   2) Elige un estilo de título (son independientes de la paleta,
+%      así que puedes combinar cualquier título con cualquier color):
+%        \tituloA{Texto}{Subtítulo}   -> marcador grueso + manchas
+%        \tituloB{Texto}{Subtítulo}   -> minimalista, subrayado fino
+%        \tituloC{Texto}              -> cursivo + barra resaltada
+%        \tituloD{Texto}              -> barras dobles (estilo cuaderno)
+%        \tituloE{Etiqueta}{Texto}    -> minimalista, pill + título limpio
+%        \tituloF{Texto}              -> minimalista, dos líneas finas
+%        \tituloG{Texto}{Subtítulo}   -> minimalista, barra lateral fina
+%        \tituloH{Texto}              -> minimalista, subrayado corto
+%        \tituloI{Texto}              -> minimalista, entre corchetes
+%        \tituloJ{Núm.}{Texto}        -> minimalista, número editorial
+%        \tituloK{Texto}              -> minimalista, marco fino completo
+%        \tituloL{Texto}              -> minimalista, esquinas de ficha
+%        \tituloM{Texto}              -> minimalista, asterisco de acento
+%        \tituloN{Texto}              -> minimalista, barras verticales
+%        \tituloO{Palabra}{Resto}     -> minimalista, 1ª palabra resaltada
+%        \tituloP{Etiqueta}{Texto}    -> minimalista, etiqueta + línea
+%        \tituloQ{Texto}              -> minimalista, subrayado ondulado
+%   3) El resto de bloques (cajas, listas, tarjetas, pills, tablas...)
+%      ya usan los colores activos automáticamente.
+% =====================================================================
+
+\usepackage{fontspec}
+\setmainfont{Nunito-Regular.ttf}[Path=./bibliotecas_latex/fonts/, BoldFont=Nunito-Bold.ttf]
+\newfontfamily\headingfont{Baloo2-Bold.ttf}[Path=./bibliotecas_latex/fonts/]
+\newfontfamily\headingfontxb{Baloo2-ExtraBold.ttf}[Path=./bibliotecas_latex/fonts/]
+\newfontfamily\bodyxb{Nunito-Bold.ttf}[Path=./bibliotecas_latex/fonts/]
+\newfontfamily\brushfont{Lobster.ttf}[Path=./bibliotecas_latex/fonts/]
+\newfontfamily\markerfont{PermanentMarker.ttf}[Path=./bibliotecas_latex/fonts/, WordSpace=2.4]
+\newfontfamily\cursivefont{Pacifico.ttf}[Path=./bibliotecas_latex/fonts/]
+\newfontfamily\handfont{Kalam-Bold.ttf}[Path=./bibliotecas_latex/fonts/]
+
+\usepackage[a4paper,left=1.6cm,right=1.6cm,top=1.4cm,bottom=1.4cm]{geometry}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tikz}
+\usetikzlibrary{shadows,calc,fit,backgrounds,decorations.pathmorphing,arrows.meta,shapes.geometric}
+\usepackage[most]{tcolorbox}
+\usepackage{enumitem}
+\usepackage{ragged2e}
+\usepackage{parskip}
+\usepackage{eso-pic}
+\usepackage{graphicx}
+\graphicspath{{./bibliotecas_latex/img/}}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+
+% =====================================================================
+% COLORES BASE (4 paletas x 6 tonos)
+% =====================================================================
+% --- Bosque (verde bosque + terracota, más vivo) ---
+\definecolor{bosqueA}{HTML}{2F5233}
+\definecolor{bosqueB}{HTML}{6B9C4D}
+\definecolor{bosqueC}{HTML}{BFE0A8}
+\definecolor{bosqueP}{HTML}{F3F1E3}
+\definecolor{bosqueX}{HTML}{D9722C}
+\definecolor{bosqueT}{HTML}{20301E}
+% --- Coral (minimalista) ---
+\definecolor{coralA}{HTML}{D97A63}
+\definecolor{coralB}{HTML}{E8A491}
+\definecolor{coralC}{HTML}{F3C9BB}
+\definecolor{coralP}{HTML}{FCEFEA}
+\definecolor{coralX}{HTML}{20201E}
+\definecolor{coralT}{HTML}{262220}
+% --- Lavanda (resaltador) ---
+\definecolor{lavA}{HTML}{9163CE}
+\definecolor{lavB}{HTML}{C9A3F0}
+\definecolor{lavC}{HTML}{E4D2FA}
+\definecolor{lavP}{HTML}{F4ECFC}
+\definecolor{lavX}{HTML}{F4D35E}
+\definecolor{lavT}{HTML}{262626}
+% --- Océano (teal / cuaderno) ---
+\definecolor{oceA}{HTML}{15806E}
+\definecolor{oceB}{HTML}{3EB89A}
+\definecolor{oceC}{HTML}{93E3CE}
+\definecolor{oceP}{HTML}{E3F8F1}
+\definecolor{oceX}{HTML}{31408F}
+\definecolor{oceT}{HTML}{262626}
+
+% =====================================================================
+% VARIABLES SEMÁNTICAS (lo que usan los bloques)
+% =====================================================================
+\colorlet{primary}{oceA}
+\colorlet{secondary}{oceB}
+\colorlet{tertiary}{oceC}
+\colorlet{pale}{oceP}
+\colorlet{accent}{oceX}
+\colorlet{ink}{oceT}
+
+\newcommand{\paletaBosque}{\colorlet{primary}{bosqueA}\colorlet{secondary}{bosqueB}\colorlet{tertiary}{bosqueC}\colorlet{pale}{bosqueP}\colorlet{accent}{bosqueX}\colorlet{ink}{bosqueT}}
+\newcommand{\paletaCoral}{\colorlet{primary}{coralA}\colorlet{secondary}{coralB}\colorlet{tertiary}{coralC}\colorlet{pale}{coralP}\colorlet{accent}{coralX}\colorlet{ink}{coralT}}
+\newcommand{\paletaLavanda}{\colorlet{primary}{lavA}\colorlet{secondary}{lavB}\colorlet{tertiary}{lavC}\colorlet{pale}{lavP}\colorlet{accent}{lavX}\colorlet{ink}{lavT}}
+\newcommand{\paletaOceano}{\colorlet{primary}{oceA}\colorlet{secondary}{oceB}\colorlet{tertiary}{oceC}\colorlet{pale}{oceP}\colorlet{accent}{oceX}\colorlet{ink}{oceT}}
+
+% =====================================================================
+% BARRA DECORATIVA DOBLE (usada por tituloD y sectionheader)
+% =====================================================================
+\newcommand{\barrule}[2][primary]{%
+  \begin{tikzpicture}[baseline={([yshift=-3.2pt]current bounding box.center)}]
+    \fill[#1]        (0,0.20) rectangle (#2,0.34);
+    \fill[#1!45!white](0,0.06) rectangle (#2,0.14);
+  \end{tikzpicture}%
+}
+
+% =====================================================================
+% ENCABEZADO DE SECCIÓN (barra – texto – barra)
+% =====================================================================
+\newlength{\barleftlen}
+\newlength{\bartextlen}
+\newlength{\barrightlen}
+\newcommand{\sectionheader}[3][primary]{%
+  \setlength{\barleftlen}{#2}%
+  \settowidth{\bartextlen}{\headingfontxb\Large #3}%
+  \setlength{\barrightlen}{\linewidth}%
+  \addtolength{\barrightlen}{-\barleftlen}%
+  \addtolength{\barrightlen}{-\bartextlen}%
+  \addtolength{\barrightlen}{-0.9cm}%
+  \noindent\barrule[#1]{\barleftlen}\hspace{4mm}{\headingfontxb\Large\color{#1} #3}\hspace{4mm}\barrule[#1]{\barrightlen}\par
+}
+
+% =====================================================================
+% ESTILOS DE TÍTULO — 4 variantes, combinables con cualquier paleta
+% =====================================================================
+
+% --- A: MARCADOR (mayúsculas gruesas sobre una franja resaltada, estilo img.1)
+\newcommand{\tituloA}[2]{%
+  \begin{center}
+  \begin{tikzpicture}
+    \node (t) {{\markerfont\fontsize{34}{34}\selectfont\color{ink} #1}};
+    \begin{pgfonlayer}{background}
+      \fill[tertiary, rotate around={-1.4:($(t.south west)!0.5!(t.north east)$)}]
+        ($(t.south west)+(-0.55,-0.20)$) rectangle ($(t.north east)+(0.55,0.24)$);
+    \end{pgfonlayer}
+  \end{tikzpicture}
+  \end{center}
+  \vspace{-1mm}
+  \begin{center}\textcolor{accent}{\rule{2.6cm}{2.6pt}}\end{center}
+  \vspace{2.5mm}
+  \begin{center}{\headingfontxb\fontsize{14}{14}\selectfont\color{primary} #2}\end{center}
+  \vspace{6mm}
+}
+
+% --- B: MINIMALISTA (título sencillo + subrayado fino, estilo img.2)
+\newcommand{\tituloB}[2]{%
+  {\headingfontxb\fontsize{22}{22}\selectfont\color{ink} #1}\par
+  \vspace{1mm}
+  \textcolor{primary}{\rule{4.4cm}{2.2pt}}\par
+  \vspace{2mm}
+  {\headingfont\fontsize{11}{11}\selectfont\color{primary} #2}\par
+  \vspace{6mm}
+}
+
+% --- C: CURSIVO + BARRA RESALTADA (estilo img.3)
+\newcommand{\tituloC}[1]{%
+  \begin{center}
+  \begin{tikzpicture}
+    \node (t) {{\brushfont\fontsize{46}{46}\selectfont\color{ink} #1}};
+    \begin{pgfonlayer}{background}
+      \fill[tertiary] ($(t.west)+(-0.9,-0.62)$) rectangle ($(t.east)+(0.9,-0.42)$);
+    \end{pgfonlayer}
+  \end{tikzpicture}
+  \end{center}%
+  \vspace{4mm}
+}
+
+% --- D: BARRAS DOBLES (estilo "cuaderno", ver primer proyecto)
+\newlength{\tituloDbar}
+\newlength{\tituloDtxt}
+\newcommand{\tituloD}[1]{%
+  \settowidth{\tituloDtxt}{\cursivefont\fontsize{46}{46}\selectfont #1}%
+  \setlength{\tituloDbar}{\linewidth}%
+  \addtolength{\tituloDbar}{-\tituloDtxt}%
+  \addtolength{\tituloDbar}{-1.6cm}%
+  \setlength{\tituloDbar}{0.5\tituloDbar}%
+  \ifdim\tituloDbar>6.8cm\relax\setlength{\tituloDbar}{6.8cm}\fi%
+  \noindent\raisebox{13pt}{\barrule[primary]{\tituloDbar}}\hspace{6mm}%
+  {\cursivefont\fontsize{46}{46}\selectfont\color{primary} #1}%
+  \hspace{6mm}\raisebox{13pt}{\barrule[primary]{\tituloDbar}}\par
+  \vspace{4mm}
+}
+
+% =====================================================================
+% CAJAS
+% =====================================================================
+\newtcolorbox{infoboxenv}[1][secondary]{
+  colback=white, colframe=#1, boxrule=1.3pt, arc=4pt,
+  boxsep=1pt, left=8pt, right=8pt, top=7pt, bottom=7pt
+}
+\newcommand{\infobox}[2][secondary]{%
+  \begin{infoboxenv}[#1]\RaggedRight\fontsize{10.6}{14.5}\selectfont\color{ink} #2\end{infoboxenv}%
+}
+\newcommand{\infoboxdup}[3][secondary]{%
+  \noindent
+  \begin{minipage}[t]{0.485\linewidth}\infobox[#1]{#2}\end{minipage}\hfill%
+  \begin{minipage}[t]{0.485\linewidth}\infobox[primary]{#3}\end{minipage}%
+}
+
+% Caja plana sin borde, fondo de color (para resaltar párrafos, estilo img.3)
+\newcommand{\highlightpar}[2][pale]{%
+  \begin{tcolorbox}[colback=#1, colframe=#1, arc=2pt, boxsep=1pt,
+      left=9pt, right=9pt, top=7pt, bottom=7pt, boxrule=0pt]
+    \RaggedRight\fontsize{10.8}{15.5}\selectfont\color{ink} #2
+  \end{tcolorbox}%
+}
+% Resalte "de rotulador" para frases sueltas dentro de un párrafo
+\newcommand{\hl}[2][pale]{\colorbox{#1}{\strut #2}}
+
+% =====================================================================
+% LISTAS: viñeta circular / viñeta rombo / numerada con círculos
+% =====================================================================
+\newlist{bulletlist}{itemize}{1}
+\setlist[bulletlist]{leftmargin=7mm, itemsep=8pt, topsep=2pt,
+  label={\raisebox{0.5pt}{\tikz\fill[primary] (0,0) circle (2.6pt);}},
+  font=\fontsize{10.6}{14.8}\selectfont\color{ink}}
+
+% Viñeta en forma de rombo (alternativa elegante, dos tonos)
+\newcommand{\diamanteicon}{%
+  \tikz[baseline=-0.55ex]{
+    \fill[primary] (0,0) -- (3.1pt,3.1pt) -- (6.2pt,0) -- (3.1pt,-3.1pt) -- cycle;
+    \fill[accent]  (3.1pt,0) -- (4.5pt,1.4pt) -- (6.2pt,0) -- (4.5pt,-1.4pt) -- cycle;
+  }%
+}
+\newlist{marcalist}{itemize}{1}
+\setlist[marcalist]{leftmargin=7mm, itemsep=7pt, topsep=2pt,
+  label={\diamanteicon}, font=\fontsize{10.6}{14.8}\selectfont\color{ink}}
+
+\newlist{steplist}{enumerate}{1}
+\setlist[steplist]{leftmargin=9mm, itemsep=9pt, topsep=2pt,
+  label={\protect\stepcircle{\arabic*}}, font=\fontsize{10.6}{14.8}\selectfont\color{ink}}
+\newcommand{\stepcircle}[1]{\tikz[baseline=-0.65ex]{\node[circle, fill=primary,
+  text=white, inner sep=0pt, minimum size=15pt,
+  font=\fontsize{8.5}{8.5}\selectfont\bfseries] {#1};}}
+
+% --- Viñeta casilla (tareas / checklist) ---
+\newcommand{\casillaicon}{%
+  \tikz[baseline=-0.1em]{\draw[primary, line width=1.1pt, rounded corners=0.6pt]
+    (0,0) rectangle (8.5pt,8.5pt);}%
+}
+\newlist{tarealist}{itemize}{1}
+\setlist[tarealist]{leftmargin=7.5mm, itemsep=8pt, topsep=2pt,
+  label={\casillaicon}, font=\fontsize{10.6}{14.8}\selectfont\color{ink}}
+
+% --- Viñeta flecha (secuencias, causa-efecto) ---
+\newcommand{\flechaicon}{%
+  \tikz[baseline=-0.5ex]{\draw[primary, line width=1.3pt,
+    -{Latex[length=2.6pt,width=2.6pt]}] (0,0) -- (0.22,0);}%
+}
+\newlist{flechalist}{itemize}{1}
+\setlist[flechalist]{leftmargin=7.5mm, itemsep=7pt, topsep=2pt,
+  label={\flechaicon}, font=\fontsize{10.6}{14.8}\selectfont\color{ink}}
+
+% --- Viñeta estrella (ideas importantes / para examen) ---
+\newcommand{\estrellaicon}{%
+  \tikz[baseline=-0.4ex]{\node[star, star points=5, star point ratio=2.25,
+    fill=accent, inner sep=0pt, minimum size=9pt] {};}%
+}
+\newlist{estrellalist}{itemize}{1}
+\setlist[estrellalist]{leftmargin=7mm, itemsep=7pt, topsep=2pt,
+  label={\estrellaicon}, font=\fontsize{10.6}{14.8}\selectfont\color{ink}}
+
+% --- Viñeta alerta (avisos, cuidado, errores comunes) ---
+\newcommand{\alertaicon}{%
+  \tikz[baseline=-0.15em]{
+    \draw[accent, line width=1.1pt, line join=round]
+      (0,0) -- (4.7pt,8.5pt) -- (9.4pt,0) -- cycle;
+    \fill[accent] (4.35pt,2.6pt) rectangle (5.05pt,5.4pt);
+    \fill[accent] (4.35pt,1.2pt) rectangle (5.05pt,1.9pt);
+  }%
+}
+\newlist{alertalist}{itemize}{1}
+\setlist[alertalist]{leftmargin=7.5mm, itemsep=7pt, topsep=2pt,
+  label={\alertaicon}, font=\fontsize{10.6}{14.8}\selectfont\color{ink}}
+
+% --- Viñeta pregunta (repaso, autoevaluación) ---
+\newcommand{\preguntaicon}{%
+  \tikz[baseline=-0.3ex]{\node[circle, fill=primary, text=white, inner sep=0pt,
+    minimum size=13pt, font=\bfseries\fontsize{7.3}{7.3}\selectfont] {?};}%
+}
+\newlist{preguntalist}{itemize}{1}
+\setlist[preguntalist]{leftmargin=7.5mm, itemsep=8pt, topsep=2pt,
+  label={\preguntaicon}, font=\fontsize{10.6}{14.8}\selectfont\color{ink}}
+
+% --- Lista con letras (a, b, c...) ---
+\newlist{letralist}{enumerate}{1}
+\setlist[letralist]{leftmargin=7.5mm, itemsep=8pt, topsep=2pt,
+  label={\headingfontxb\color{primary}\alph*)},
+  font=\fontsize{10.6}{14.8}\selectfont\color{ink}}
+
+% =====================================================================
+% NOTA CON BORDE LATERAL / PÍLDORA / TARJETA CON CABECERA / DATO
+% =====================================================================
+\newcommand{\tipbox}[3][accent]{%
+  \noindent
+  \begin{tcolorbox}[colback=pale, colframe=pale, borderline west={3.2pt}{0pt}{#1},
+      arc=2pt, boxsep=1pt, left=10pt, right=8pt, top=7pt, bottom=7pt, boxrule=0pt]
+    {\headingfontxb\color{#1}\fontsize{10.6}{13}\selectfont #2}\\[2pt]
+    \RaggedRight\fontsize{10.1}{14}\selectfont\color{ink} #3
+  \end{tcolorbox}%
+}
+\newcommand{\pill}[2][primary]{%
+  \tikz[baseline=-0.6ex]\node[fill=#1, rounded corners=7pt, inner xsep=8pt,
+    inner ysep=3.5pt, font=\headingfontxb\color{white}\fontsize{8.5}{8.5}\selectfont] {#2};%
+}
+\newcommand{\typecard}[3][primary]{%
+  \begin{tcolorbox}[colback=white, colframe=#1, boxrule=1.2pt, arc=5pt,
+      boxsep=0pt, left=8pt, right=8pt, bottom=7pt, top=2pt,
+      colbacktitle=#1, coltitle=white, fonttitle=\headingfontxb,
+      title={\fontsize{10.5}{10.5}\selectfont #2}]
+    \RaggedRight\fontsize{9.6}{13.2}\selectfont\color{ink} #3
+  \end{tcolorbox}%
+}
+% Dos tarjetas lado a lado (envuelve \typecard en minipages)
+\newcommand{\typecardpair}[5][primary]{%
+  \noindent
+  \begin{minipage}[t]{0.485\linewidth}\typecard[#1]{#2}{#3}\end{minipage}\hfill%
+  \begin{minipage}[t]{0.485\linewidth}\typecard[secondary]{#4}{#5}\end{minipage}%
+}
+\newcommand{\statbox}[3][primary]{%
+  \tikz{\node[fill=#1, rounded corners=7pt, text width=3.5cm, align=center,
+    inner sep=10pt] {{\headingfontxb\color{white}\fontsize{21}{21}\selectfont #2}\\[3pt]
+    {\color{white}\fontsize{8}{9.7}\selectfont #3}};}%
+}
+
+% =====================================================================
+% CAJA RESUMEN CON SOMBRA
+% =====================================================================
+\newcommand{\shadowbox}[2][tertiary]{%
+  \begin{center}
+  \begin{tikzpicture}
+    \node[draw=ink, line width=0.9pt, fill=white, rounded corners=1.5pt,
+      text width=16.6cm, align=left, inner sep=12pt] (box) {%
+      \fontsize{11}{15.5}\selectfont\color{ink} #2%
+    };
+    \begin{pgfonlayer}{background}
+      \node[fill=#1, rounded corners=5pt, fit=(box), inner sep=0pt,
+        xshift=0.28cm, yshift=-0.28cm] (shadow) {};
+    \end{pgfonlayer}
+  \end{tikzpicture}
+  \end{center}%
+}
+\newcommand{\closingbars}{\barrule[primary]{7.3cm}\hfill\barrule[primary]{7.3cm}\par}
+
+% --- E: MINIMALISTA CON ETIQUETA (pill pequeña + título limpio, sin líneas)
+\newcommand{\tituloE}[2]{%
+  % #1 = etiqueta corta (ej. "TEMA 01"), #2 = título
+  \pill[primary]{#1}\par
+  \vspace{2mm}
+  {\headingfontxb\fontsize{22}{22}\selectfont\color{ink} #2}\par
+  \vspace{5mm}
+}
+
+% --- F: MINIMALISTA CON DOS LÍNEAS FINAS (arriba y abajo, muy reducido)
+\newcommand{\tituloF}[1]{%
+  \begin{center}
+    \textcolor{primary}{\rule{3.2cm}{0.8pt}}\par
+    \vspace{1.5mm}
+    {\headingfontxb\fontsize{23}{23}\selectfont\color{ink} #1}\par
+    \vspace{1.5mm}
+    \textcolor{primary}{\rule{3.2cm}{0.8pt}}\par
+  \end{center}
+  \vspace{4mm}
+}
+
+% --- G: MINIMALISTA CON BARRA LATERAL (título + subtítulo junto a un filo de color)
+\newcommand{\tituloG}[2]{%
+  % #1 = título, #2 = subtítulo
+  \noindent
+  \begin{tikzpicture}[baseline]
+    \fill[primary] (0,-0.08) rectangle (0.11,0.92);
+  \end{tikzpicture}%
+  \hspace{4mm}%
+  \begin{minipage}[c]{0.88\linewidth}
+    {\headingfontxb\fontsize{19}{19}\selectfont\color{ink} #1}\\[1mm]
+    {\headingfont\fontsize{9.8}{9.8}\selectfont\color{primary} #2}
+  \end{minipage}\par
+  \vspace{5mm}
+}
+
+% --- H: MINIMALISTA CON SUBRAYADO CORTO A LA IZQUIERDA (estilo editorial)
+\newcommand{\tituloH}[1]{%
+  {\headingfontxb\fontsize{22}{22}\selectfont\color{ink} #1}\par
+  \vspace{1.5mm}
+  \textcolor{primary}{\rule{1.6cm}{3pt}}\par
+  \vspace{6mm}
+}
+
+% --- I: MINIMALISTA ENTRE CORCHETES TIPOGRÁFICOS
+\newcommand{\tituloI}[1]{%
+  \begin{center}
+    {\headingfont\fontsize{20}{20}\selectfont\color{primary}[\,}%
+    {\headingfontxb\fontsize{20}{20}\selectfont\color{ink} #1}%
+    {\headingfont\fontsize{20}{20}\selectfont\color{primary}\,]}
+  \end{center}
+  \vspace{6mm}
+}
+
+% --- J: MINIMALISTA CON NÚMERO GRANDE (estilo revista / editorial)
+\newcommand{\tituloJ}[2]{%
+  % #1 = número o código corto (ej. "01"), #2 = título
+  \noindent
+  \begin{minipage}[c]{2.1cm}
+    {\headingfontxb\fontsize{40}{40}\selectfont\color{tertiary} #1}
+  \end{minipage}%
+  \begin{minipage}[c]{0.75\linewidth}
+    {\headingfontxb\fontsize{19}{19}\selectfont\color{ink} #2}
+  \end{minipage}\par
+  \vspace{6mm}
+}
+
+% --- K: MINIMALISTA CON MARCO FINO COMPLETO
+\newcommand{\tituloK}[1]{%
+  \begin{center}
+  \begin{tikzpicture}
+    \node[draw=primary, line width=1pt, inner xsep=14pt, inner ysep=8pt]
+      {\headingfontxb\fontsize{19}{19}\selectfont\color{ink} #1};
+  \end{tikzpicture}
+  \end{center}
+  \vspace{6mm}
+}
+
+% --- L: MINIMALISTA CON ESQUINAS TIPO FICHA TÉCNICA
+\newcommand{\tituloL}[1]{%
+  \begin{center}
+  \begin{tikzpicture}
+    \node (t) [inner xsep=12pt, inner ysep=8pt]
+      {\headingfontxb\fontsize{19}{19}\selectfont\color{ink} #1};
+    \draw[primary, line width=1.1pt] (t.north west) -- ++(0.35,0) (t.north west) -- ++(0,-0.35);
+    \draw[primary, line width=1.1pt] (t.north east) -- ++(-0.35,0) (t.north east) -- ++(0,-0.35);
+    \draw[primary, line width=1.1pt] (t.south west) -- ++(0.35,0) (t.south west) -- ++(0,0.35);
+    \draw[primary, line width=1.1pt] (t.south east) -- ++(-0.35,0) (t.south east) -- ++(0,0.35);
+  \end{tikzpicture}
+  \end{center}
+  \vspace{6mm}
+}
+
+% --- M: MINIMALISTA CON ASTERISCO DE ACENTO
+\newcommand{\tituloM}[1]{%
+  {\headingfontxb\color{accent}\fontsize{20}{20}\selectfont *~}%
+  {\headingfontxb\fontsize{20}{20}\selectfont\color{ink} #1}\par
+  \vspace{6mm}
+}
+
+% --- N: MINIMALISTA CON BARRAS VERTICALES A LOS LADOS
+\newcommand{\tituloN}[1]{%
+  \begin{center}
+    \textcolor{primary}{\rule{1.4pt}{0.55cm}}\hspace{4mm}%
+    {\headingfontxb\fontsize{20}{20}\selectfont\color{ink} #1}%
+    \hspace{4mm}\textcolor{primary}{\rule{1.4pt}{0.55cm}}
+  \end{center}
+  \vspace{6mm}
+}
+
+% --- O: MINIMALISTA CON PRIMERA PALABRA RESALTADA
+\newcommand{\tituloO}[2]{%
+  % #1 = primera palabra (con fondo de color), #2 = resto del título
+  \colorbox{tertiary}{\strut\headingfontxb\fontsize{20}{20}\selectfont\color{ink} #1}%
+  \ {\headingfontxb\fontsize{20}{20}\selectfont\color{ink} #2}\par
+  \vspace{6mm}
+}
+
+% --- P: MINIMALISTA CON ETIQUETA EN LA ESQUINA (estilo ficha)
+\newcommand{\tituloP}[2]{%
+  % #1 = etiqueta pequeña (ej. "APUNTE"), #2 = título
+  {\headingfont\fontsize{8.5}{8.5}\selectfont\color{primary} #1}\par
+  \vspace{0.5mm}
+  {\headingfontxb\fontsize{21}{21}\selectfont\color{ink} #2}\par
+  \vspace{1.5mm}
+  \textcolor{tertiary}{\rule{\linewidth}{1.4pt}}\par
+  \vspace{5mm}
+}
+
+% --- Q: MINIMALISTA CON SUBRAYADO ONDULADO
+\newcommand{\tituloQ}[1]{%
+  \begin{center}
+  \begin{tikzpicture}
+    \node (t) {{\headingfontxb\fontsize{20}{20}\selectfont\color{ink} #1}};
+    \draw[primary, line width=1.4pt, decorate,
+      decoration={coil, aspect=0, segment length=6.5pt, amplitude=1.3pt}]
+      ($(t.south west)+(0,-0.14)$) -- ($(t.south east)+(0,-0.14)$);
+  \end{tikzpicture}
+  \end{center}
+  \vspace{6mm}
+}
+
+% =====================================================================
+% FONDO SUTIL (franja lateral + puntos) + PIE DE PÁGINA
+% =====================================================================
+\newcommand{\pagebackground}{%
+  \begin{tikzpicture}[remember picture, overlay]
+    \fill[pale] ([xshift=0cm]current page.south west) rectangle
+                ([xshift=0.38cm]current page.north west);
+    \foreach \x in {2,4,...,19}{\foreach \y in {2,4,...,28}{
+      \fill[pale] ($(current page.south west)+(\x*1.05cm,\y*1.0cm)$) circle (0.8pt);}}
+  \end{tikzpicture}%
+}
+\newcommand{\usarfondo}{\AddToShipoutPictureBG{\pagebackground}}
+\newcommand{\pagefoot}[1]{\vfill\begin{center}\pill[primary]{#1}\end{center}}
+
+% =====================================================================
+% TABLA MINIMALISTA (solo líneas horizontales, sin verticales)
+% =====================================================================
+%  USO:
+%    \begin{tablaminimal}{lcc}          <- especificación de columnas
+%      \tablacab{Nombre} & \tablacab{Edad} & \tablacab{Ciudad} \\
+%      \midrule
+%      Ana   & 23 & Madrid  \\
+%      Luis  & 31 & Sevilla \\
+%    \end{tablaminimal}
+%  \tablacab{texto} da formato de cabecera (negrita + color primary).
+%  Las filas del cuerpo alternan un fondo "pale" muy sutil automáticamente.
+% =====================================================================
+\newenvironment{tablaminimal}[1]{%
+  \begingroup
+  \arrayrulecolor{primary}
+  \renewcommand{\arraystretch}{1.15}
+  \rowcolors{2}{white}{pale}
+  \begin{center}
+  \fontsize{10.2}{13}\selectfont\color{ink}
+  \begin{tabular}{#1}
+  \toprule[1.1pt]
+}{%
+  \bottomrule[1.1pt]
+  \end{tabular}
+  \end{center}
+  \endgroup
+}
+\newcommand{\tablacab}[1]{{\headingfontxb\color{primary}\fontsize{10.2}{13}\selectfont #1}}
+
+% =====================================================================
+% TABLA CON CABECERA DE COLOR SÓLIDO
+% =====================================================================
+%  USO:
+%    \begin{tablacabecera}{lll}
+%      \rowcolor{primary}
+%      \tablacabb{Nombre} & \tablacabb{Edad} & \tablacabb{Ciudad} \\
+%      Ana   & 23 & Madrid  \\
+%      Luis  & 31 & Sevilla \\
+%    \end{tablacabecera}
+%  \tablacabb{texto} da formato de cabecera en blanco (para fondo de color).
+%  La fila de cabecera necesita \rowcolor{primary} (o cualquier color) justo
+%  antes de escribirla.
+% =====================================================================
+\newenvironment{tablacabecera}[1]{%
+  \begingroup
+  \arrayrulecolor{tertiary}
+  \renewcommand{\arraystretch}{1.3}
+  \rowcolors{2}{white}{pale}
+  \begin{center}
+  \fontsize{10.2}{13}\selectfont\color{ink}
+  \begin{tabular}{#1}
+}{%
+  \bottomrule[0.8pt]
+  \end{tabular}
+  \end{center}
+  \endgroup
+}
+\newcommand{\tablacabb}[1]{{\headingfontxb\color{white}\fontsize{10.2}{13}\selectfont #1}}
+
+% =====================================================================
+% TABLA CON CUADRÍCULA COMPLETA (bordes finos en todas las celdas)
+% =====================================================================
+%  USO:
+%    \begin{tablacuadricula}{|l|c|c|}     <- especificación CON barras "|"
+%      \tablacab{Producto} & \tablacab{Precio} & \tablacab{Stock} \\ \hline
+%      Manzana & 1,20€ & 34 \\ \hline
+%      Pan     & 0,90€ & 12 \\ \hline
+%    \end{tablacuadricula}
+%  El primer \hline lo pone el propio entorno; el resto los escribes tú
+%  tras cada fila, como en una tabla LaTeX normal.
+% =====================================================================
+\newenvironment{tablacuadricula}[1]{%
+  \begingroup
+  \arrayrulecolor{tertiary}
+  \renewcommand{\arraystretch}{1.35}
+  \begin{center}
+  \fontsize{10.2}{13}\selectfont\color{ink}
+  \begin{tabular}{#1}
+  \hline
+}{%
+  \end{tabular}
+  \end{center}
+  \endgroup
+}
+
+% =====================================================================
+% TABLA COMPARATIVA CON SÍ / NO (para comparar características)
+% =====================================================================
+%  USO: reutiliza \tablaminimal + los símbolos \si y \no en las celdas.
+%    \begin{tablaminimal}{lcc}
+%      \tablacab{Función} & \tablacab{Plan Básico} & \tablacab{Plan Pro} \\
+%      \midrule
+%      Soporte 24h   & \no & \si \\
+%      Exportar PDF  & \si & \si \\
+%    \end{tablaminimal}
+% =====================================================================
+\newcommand{\si}{\tikz[baseline=-0.4ex]{\draw[primary, line width=1.4pt,
+  line cap=round, line join=round] (0,0.075) -- (0.055,0) -- (0.16,0.135);}}
+\newcommand{\no}{\tikz[baseline=-0.4ex]{
+  \draw[accent, line width=1.4pt, line cap=round] (0,0) -- (0.13,0.13);
+  \draw[accent, line width=1.4pt, line cap=round] (0,0.13) -- (0.13,0);}}
+
+% =====================================================================
+% FICHA CLAVE-VALOR (cuadro sin rejilla, tipo ficha de datos)
+% =====================================================================
+%  USO:
+%    \begin{fichaclave}{3.2cm}            <- ancho de la columna "clave"
+%      \fichaitem{Nombre}{Ana Torres}
+%      \fichaitem{Fecha}{20/08/2026}
+%      \fichaitem{Tema}{Introducción al neuromarketing}
+%    \end{fichaclave}
+% =====================================================================
+\newenvironment{fichaclave}[1]{%
+  \begingroup
+  \arrayrulecolor{pale}
+  \renewcommand{\arraystretch}{1.6}
+  \begin{center}
+  \fontsize{10.4}{14}\selectfont\color{ink}
+  \begin{tabular}{@{}>{\raggedright\arraybackslash}m{#1}@{\hspace{4mm}}l@{}}
+}{%
+  \end{tabular}
+  \end{center}
+  \endgroup
+}
+\newcommand{\fichaitem}[2]{{\headingfontxb\color{primary} #1} & #2 \\ \hline}
+
+% =====================================================================
+% ESTRUCTURAS DE FILA: IMAGEN + RECUADRO / CONTENIDO + CONTENIDO
+% =====================================================================
+%  USO — imagen a la izquierda, texto o caja a la derecha:
+%    \filaimagen{5.5cm}{ruta/imagen.png}{
+%      \infobox{Texto que acompaña a la imagen...}
+%    }
+%  USO — imagen a la derecha, texto o caja a la izquierda:
+%    \filaimagender{5.5cm}{ruta/imagen.png}{
+%      \infobox{Texto que acompaña a la imagen...}
+%    }
+%  USO — dos contenidos cualquiera en fila (caja + caja, texto + tabla...):
+%    \filacontenido{7cm}{
+%      contenido de la izquierda
+%    }{
+%      contenido de la derecha
+%    }
+%  El primer argumento numérico es el ancho de la primera columna;
+%  la segunda columna ocupa automáticamente el espacio restante.
+% =====================================================================
+\newcommand{\filaimagen}[3]{%
+  \noindent
+  \begin{minipage}[t]{#1}
+    \includegraphics[width=\linewidth]{#2}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{\dimexpr\linewidth-#1-6mm\relax}
+    #3
+  \end{minipage}\par
+}
+\newcommand{\filaimagender}[3]{%
+  \noindent
+  \begin{minipage}[t]{\dimexpr\linewidth-#1-6mm\relax}
+    #3
+  \end{minipage}\hfill
+  \begin{minipage}[t]{#1}
+    \includegraphics[width=\linewidth]{#2}
+  \end{minipage}\par
+}
+\newcommand{\filacontenido}[3]{%
+  \noindent
+  \begin{minipage}[t]{#1}#2\end{minipage}\hfill
+  \begin{minipage}[t]{\dimexpr\linewidth-#1-6mm\relax}#3\end{minipage}\par
+}
