@@ -30,14 +30,14 @@
 % =====================================================================
 
 \usepackage{fontspec}
-\setmainfont{Nunito-Regular.ttf}[Path=./bibliotecas_latex/fonts/, BoldFont=Nunito-Bold.ttf]
-\newfontfamily\headingfont{Baloo2-Bold.ttf}[Path=./bibliotecas_latex/fonts/]
-\newfontfamily\headingfontxb{Baloo2-ExtraBold.ttf}[Path=./bibliotecas_latex/fonts/]
-\newfontfamily\bodyxb{Nunito-Bold.ttf}[Path=./bibliotecas_latex/fonts/]
+\setmainfont{NunitoRegular.ttf}[Path=./bibliotecas_latex/fonts/, BoldFont=NunitoBold.ttf]
+\newfontfamily\headingfont{Baloo2Bold.ttf}[Path=./bibliotecas_latex/fonts/]
+\newfontfamily\headingfontxb{Baloo2ExtraBold.ttf}[Path=./bibliotecas_latex/fonts/]
+\newfontfamily\bodyxb{NunitoBold.ttf}[Path=./bibliotecas_latex/fonts/]
 \newfontfamily\brushfont{Lobster.ttf}[Path=./bibliotecas_latex/fonts/]
 \newfontfamily\markerfont{PermanentMarker.ttf}[Path=./bibliotecas_latex/fonts/, WordSpace=2.4]
 \newfontfamily\cursivefont{Pacifico.ttf}[Path=./bibliotecas_latex/fonts/]
-\newfontfamily\handfont{Kalam-Bold.ttf}[Path=./bibliotecas_latex/fonts/]
+\newfontfamily\handfont{KalamBold.ttf}[Path=./bibliotecas_latex/fonts/]
 
 \usepackage[a4paper,left=1.6cm,right=1.6cm,top=1.4cm,bottom=1.4cm]{geometry}
 \usepackage{xcolor}
@@ -51,7 +51,6 @@
 \usepackage{parskip}
 \usepackage{eso-pic}
 \usepackage{graphicx}
-\graphicspath{{./bibliotecas_latex/img/}}
 \pagestyle{empty}
 \setlength{\parindent}{0pt}
 
@@ -136,18 +135,18 @@
 \newcommand{\tituloA}[2]{%
   \begin{center}
   \begin{tikzpicture}
-    \node (t) {{\markerfont\fontsize{34}{34}\selectfont\color{ink} #1}};
+    \node (t) [text width=15.5cm, align=center] {{\markerfont\fontsize{23}{27}\selectfont\color{ink} #1}};
     \begin{pgfonlayer}{background}
       \fill[tertiary, rotate around={-1.4:($(t.south west)!0.5!(t.north east)$)}]
-        ($(t.south west)+(-0.55,-0.20)$) rectangle ($(t.north east)+(0.55,0.24)$);
+        ($(t.south west)+(-0.35,-0.15)$) rectangle ($(t.north east)+(0.35,0.18)$);
     \end{pgfonlayer}
   \end{tikzpicture}
   \end{center}
   \vspace{-1mm}
   \begin{center}\textcolor{accent}{\rule{2.6cm}{2.6pt}}\end{center}
   \vspace{2.5mm}
-  \begin{center}{\headingfontxb\fontsize{14}{14}\selectfont\color{primary} #2}\end{center}
-  \vspace{6mm}
+  \begin{center}{\headingfontxb\fontsize{13}{16}\selectfont\color{primary} #2}\end{center}
+  \vspace{5mm}
 }
 
 % --- B: MINIMALISTA (título sencillo + subrayado fino, estilo img.2)
@@ -164,9 +163,9 @@
 \newcommand{\tituloC}[1]{%
   \begin{center}
   \begin{tikzpicture}
-    \node (t) {{\brushfont\fontsize{46}{46}\selectfont\color{ink} #1}};
+    \node (t) [text width=15.5cm, align=center] {{\brushfont\fontsize{24}{28}\selectfont\color{ink} #1}};
     \begin{pgfonlayer}{background}
-      \fill[tertiary] ($(t.west)+(-0.9,-0.62)$) rectangle ($(t.east)+(0.9,-0.42)$);
+      \fill[tertiary] ($(t.south west)+(-0.25,-0.15)$) rectangle ($(t.south east)+(0.25,0.18)$);
     \end{pgfonlayer}
   \end{tikzpicture}
   \end{center}%
@@ -174,19 +173,13 @@
 }
 
 % --- D: BARRAS DOBLES (estilo "cuaderno", ver primer proyecto)
-\newlength{\tituloDbar}
-\newlength{\tituloDtxt}
 \newcommand{\tituloD}[1]{%
-  \settowidth{\tituloDtxt}{\cursivefont\fontsize{46}{46}\selectfont #1}%
-  \setlength{\tituloDbar}{\linewidth}%
-  \addtolength{\tituloDbar}{-\tituloDtxt}%
-  \addtolength{\tituloDbar}{-1.6cm}%
-  \setlength{\tituloDbar}{0.5\tituloDbar}%
-  \ifdim\tituloDbar>6.8cm\relax\setlength{\tituloDbar}{6.8cm}\fi%
-  \noindent\raisebox{13pt}{\barrule[primary]{\tituloDbar}}\hspace{6mm}%
-  {\cursivefont\fontsize{46}{46}\selectfont\color{primary} #1}%
-  \hspace{6mm}\raisebox{13pt}{\barrule[primary]{\tituloDbar}}\par
-  \vspace{4mm}
+  \begin{center}
+    \barrule[primary]{1.5cm}\hspace{4mm}%
+    {\cursivefont\fontsize{22}{26}\selectfont\color{primary} #1}%
+    \hspace{4mm}\barrule[primary]{1.5cm}
+  \end{center}
+  \vspace{3mm}
 }
 
 % =====================================================================
@@ -348,7 +341,7 @@
   \end{tikzpicture}
   \end{center}%
 }
-\newcommand{\closingbars}{\barrule[primary]{7.3cm}\hfill\barrule[primary]{7.3cm}\par}
+\newcommand{\closingbars}{}
 
 % --- E: MINIMALISTA CON ETIQUETA (pill pequeña + título limpio, sin líneas)
 \newcommand{\tituloE}[2]{%
@@ -421,26 +414,26 @@
 \newcommand{\tituloK}[1]{%
   \begin{center}
   \begin{tikzpicture}
-    \node[draw=primary, line width=1pt, inner xsep=14pt, inner ysep=8pt]
-      {\headingfontxb\fontsize{19}{19}\selectfont\color{ink} #1};
+    \node[draw=primary, line width=1pt, text width=15cm, align=center, inner xsep=12pt, inner ysep=8pt]
+      {\headingfontxb\fontsize{18}{22}\selectfont\color{ink} #1};
   \end{tikzpicture}
   \end{center}
-  \vspace{6mm}
+  \vspace{5mm}
 }
 
 % --- L: MINIMALISTA CON ESQUINAS TIPO FICHA TÉCNICA
 \newcommand{\tituloL}[1]{%
   \begin{center}
   \begin{tikzpicture}
-    \node (t) [inner xsep=12pt, inner ysep=8pt]
-      {\headingfontxb\fontsize{19}{19}\selectfont\color{ink} #1};
+    \node (t) [text width=15cm, align=center, inner xsep=12pt, inner ysep=8pt]
+      {\headingfontxb\fontsize{18}{22}\selectfont\color{ink} #1};
     \draw[primary, line width=1.1pt] (t.north west) -- ++(0.35,0) (t.north west) -- ++(0,-0.35);
     \draw[primary, line width=1.1pt] (t.north east) -- ++(-0.35,0) (t.north east) -- ++(0,-0.35);
     \draw[primary, line width=1.1pt] (t.south west) -- ++(0.35,0) (t.south west) -- ++(0,0.35);
     \draw[primary, line width=1.1pt] (t.south east) -- ++(-0.35,0) (t.south east) -- ++(0,0.35);
   \end{tikzpicture}
   \end{center}
-  \vspace{6mm}
+  \vspace{5mm}
 }
 
 % --- M: MINIMALISTA CON ASTERISCO DE ACENTO
@@ -483,7 +476,7 @@
 \newcommand{\tituloQ}[1]{%
   \begin{center}
   \begin{tikzpicture}
-    \node (t) {{\headingfontxb\fontsize{20}{20}\selectfont\color{ink} #1}};
+    \node (t) [text width=15cm, align=center] {{\headingfontxb\fontsize{18}{22}\selectfont\color{ink} #1}};
     \draw[primary, line width=1.4pt, decorate,
       decoration={coil, aspect=0, segment length=6.5pt, amplitude=1.3pt}]
       ($(t.south west)+(0,-0.14)$) -- ($(t.south east)+(0,-0.14)$);

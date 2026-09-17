@@ -356,7 +356,6 @@ jobs:
           if en_codigo:
               cuerpo.append(r"\end{verbatim}")
 
-          cuerpo.append("\n\\vspace{4mm}\n\\closingbars\n")
           cuerpo_tex = "\n".join(cuerpo)
 
           # Verificar disponibilidad de estilo.tex
