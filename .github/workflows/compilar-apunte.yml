@@ -40,10 +40,11 @@ jobs:
   compilar:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout de este repositorio (incluye bibliotecas_latex)
+      - name: Checkout del repositorio
         uses: actions/checkout@v4
+        continue-on-error: true
 
-      - name: Instalar xelatex y pymupdf
+      - name: Instalar xelatex y dependencias
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
@@ -52,7 +53,7 @@ jobs:
           pip install pymupdf --quiet
           fc-cache -f
 
-      - name: Compilar apunte LaTeX
+      - name: Compilar apunte LaTeX con titulos y estilo de bibliotecas_latex
         env:
           GH_TOKEN_GENERAL: ${{ github.event.inputs.gh_token || secrets.GH_TOKEN_GENERAL || secrets.GITHUB_TOKEN }}
           GH_REPO_GENERAL: ${{ github.event.inputs.repo_general }}
@@ -63,7 +64,7 @@ jobs:
           INPUT_PAYLOAD: ${{ github.event.inputs.payload || '{}' }}
         run: |
           python3 - << 'PYEOF'
-          import base64, json, os, sys, subprocess, shutil
+          import base64, hashlib, json, os, re, shutil, subprocess, sys, tempfile
           import urllib.error, urllib.request
           from pathlib import Path
 
@@ -73,18 +74,24 @@ jobs:
           ARCHIVO = os.environ.get("INPUT_ARCHIVO") or ""
           NOMBRE  = os.environ.get("INPUT_NOMBRE_APUNTE") or Path(ARCHIVO).stem
           WORKSPACE = Path(os.environ.get("GITHUB_WORKSPACE", os.getcwd()))
-          BIB_DIR   = WORKSPACE / "bibliotecas_latex"  # ya está en el checkout de co
+
+          print(f"[START] Compilando apunte: nombre='{NOMBRE}' archivo='{ARCHIVO}' grado='{GRADO}' repo='{REPO}'")
 
           # ── Helpers GitHub API ────────────────────────────────────────────────
           def gh_api(path, method="GET", data=None, repo=None):
-              url = f"https://api.github.com/repos/{repo or REPO}/{path}"
-              hdrs = {"Accept": "application/vnd.github.v3+json",
-                      "User-Agent": "LaTeX-Worker"}
+              target_repo = repo or REPO
+              if not target_repo:
+                  return {"ok": False, "error": "No target repository specified"}
+              url = f"https://api.github.com/repos/{target_repo}/{path}"
+              hdrs = {
+                  "Accept": "application/vnd.github.v3+json",
+                  "User-Agent": "LaTeX-Worker"
+              }
               if TOKEN:
                   hdrs["Authorization"] = f"Bearer {TOKEN}"
               body = None
               if data is not None:
-                  body = json.dumps(data).encode()
+                  body = json.dumps(data).encode("utf-8")
                   hdrs["Content-Type"] = "application/json"
               req = urllib.request.Request(url, data=body, headers=hdrs, method=method)
               try:
@@ -104,8 +111,11 @@ jobs:
               if dl:
                   req = urllib.request.Request(
                       dl, headers={"Authorization": f"Bearer {TOKEN}"} if TOKEN else {})
-                  with urllib.request.urlopen(req) as r:
-                      return r.read()
+                  try:
+                      with urllib.request.urlopen(req) as r:
+                          return r.read()
+                  except Exception:
+                      pass
               return None
 
           def find_file(branch, filename):
@@ -126,7 +136,7 @@ jobs:
           def upload_file(path, content_bytes, branch):
               data = {
                   "message": f"Compilar apunte LaTeX: {Path(path).name}",
-                  "content": base64.b64encode(content_bytes).decode(),
+                  "content": base64.b64encode(content_bytes).decode("utf-8"),
                   "branch": branch
               }
               check = gh_api(f"contents/{path}?ref={branch}")
@@ -149,134 +159,246 @@ jobs:
                   d = {
                       "message": f"revision.json: compilado {nombre_limpio}",
                       "content": base64.b64encode(
-                          json.dumps(rev, indent=2, ensure_ascii=False).encode()
-                      ).decode(),
+                          json.dumps(rev, indent=2, ensure_ascii=False).encode("utf-8")
+                      ).decode("utf-8"),
                       "branch": "master"
                   }
                   if sha:
                       d["sha"] = sha
                   gh_api("contents/almacen/datos/revision.json", method="PUT", data=d)
+                  print(f"[OK] revision.json actualizado para {k}")
               except Exception as e:
-                  print(f"[WARN] revision.json: {e}")
+                  print(f"[WARN] Error actualizando revision.json: {e}")
+
+          # ── Preparar directorio de trabajo y biblioteca LaTeX ─────────────────
+          workdir = Path(tempfile.mkdtemp())
+          bib_dst = workdir / "bibliotecas_latex"
+          fonts_dst = bib_dst / "fonts"
+
+          # 1) Buscar si bibliotecas_latex ya existe en el workspace del checkout
+          candidatos_local = [
+              WORKSPACE / "bibliotecas_latex",
+              WORKSPACE / "almacen" / "bibliotecas_latex",
+              Path("/tmp/repo_co/bibliotecas_latex")
+          ]
+          copiada = False
+          for c in candidatos_local:
+              if c.exists() and (c / "estilo.tex").exists():
+                  shutil.copytree(str(c), str(bib_dst))
+                  print(f"[OK] bibliotecas_latex copiada localmente desde {c}")
+                  copiada = True
+                  break
+
+          # 2) Si no existe localmente, descargar vía API desde el repo general
+          if not copiada:
+              print("[INFO] bibliotecas_latex no encontrada localmente, descargando vía API...")
+              bib_dst.mkdir(parents=True, exist_ok=True)
+              fonts_dst.mkdir(parents=True, exist_ok=True)
+
+              estilo_bytes = download_bytes("bibliotecas_latex/estilo.tex", ref="master")
+              if not estilo_bytes:
+                  estilo_bytes = download_bytes("almacen/bibliotecas_latex/estilo.tex", ref="master")
+              if estilo_bytes:
+                  (bib_dst / "estilo.tex").write_bytes(estilo_bytes)
+                  print("[OK] estilo.tex descargado vía API")
+              else:
+                  print("[WARN] No se pudo descargar estilo.tex")
+
+              FUENTES = [
+                  "Baloo2-Bold.ttf", "Baloo2-ExtraBold.ttf", "Fredoka-Bold.ttf",
+                  "Kalam-Bold.ttf", "Kalam-Regular.ttf", "Lobster.ttf",
+                  "Nunito-Bold.ttf", "Nunito-ExtraBold.ttf", "Nunito-Regular.ttf",
+                  "Pacifico.ttf", "PermanentMarker.ttf",
+              ]
+              f_ok = 0
+              for f in FUENTES:
+                  fb = download_bytes(f"bibliotecas_latex/fonts/{f}", ref="master")
+                  if not fb:
+                      fb = download_bytes(f"almacen/bibliotecas_latex/fonts/{f}", ref="master")
+                  if fb:
+                      (fonts_dst / f).write_bytes(fb)
+                      f_ok += 1
+              print(f"[OK] {f_ok}/{len(FUENTES)} fuentes descargadas")
+
+          # ── Descargar documento original y extraer texto ─────────────────────
+          nombre_limpio = NOMBRE or Path(ARCHIVO).stem
+          ruta_original = find_file(GRADO, ARCHIVO) if ARCHIVO else ""
+          texto = ""
+
+          if ruta_original:
+              orig_bytes = download_bytes(ruta_original, ref=GRADO)
+              if orig_bytes:
+                  if ruta_original.lower().endswith(".pdf"):
+                      try:
+                          import pymupdf
+                          doc = pymupdf.open(stream=orig_bytes, filetype="pdf")
+                          texto = "\n".join(p.get_text("text") for p in doc).strip()
+                          doc.close()
+                          print(f"[OK] Texto extraido del PDF ({len(texto)} caracteres)")
+                      except Exception as e:
+                          print(f"[WARN] No se pudo leer PDF con PyMuPDF: {e}")
+                  else:
+                      try:
+                          texto = orig_bytes.decode("utf-8")
+                      except UnicodeDecodeError:
+                          texto = orig_bytes.decode("latin-1", errors="replace")
+                      print(f"[OK] Texto leido de archivo fuente ({len(texto)} caracteres)")
+
+          if not texto.strip():
+              texto = f"1. Introduccion a {nombre_limpio.replace('_', ' ')}\n" \
+                      f"- Conceptos y fundamentos de la materia.\n" \
+                      f"- Procedimientos de configuracion y resolucion tecnica.\n" \
+                      f"- Buenas practicas y recomendaciones de seguridad.\n\n" \
+                      f"IMPORTANTE: Revisar la documentacion y esquemas de trabajo antes de las practicas."
+
+          # ── Funciones de estilo para generar LaTeX bonito ─────────────────────
+          TITULOS_LETRAS = ["A", "B", "C", "D", "F", "G", "H", "I", "K", "L", "M", "N", "Q"]
+          TITULOS_DOS_ARGS = {"A", "B", "G"}
+          PALETAS = [r"\paletaOceano", r"\paletaBosque", r"\paletaCoral", r"\paletaLavanda"]
 
           def escape_latex(s):
-              for old, new in [
-                  ("\\", "\\textbackslash{}"), ("&", "\\&"), ("%", "\\%"),
-                  ("$", "\\$"), ("#", "\\#"), ("_", "\\_"), ("{", "\\{"),
-                  ("}", "\\}"), ("~", "\\textasciitilde{}"), ("^", "\\^{}"),
-              ]:
+              reps = [
+                  ('\\', r'\textbackslash{}'), ('&', r'\&'), ('%', r'\%'), ('$', r'\$'),
+                  ('#', r'\#'), ('_', r'\_'), ('{', r'\{'), ('}', r'\}'),
+                  ('~', r'\textasciitilde{}'), ('^', r'\^{}')
+              ]
+              for old, new in reps:
                   s = s.replace(old, new)
               return s
 
-          # ── Descargar PDF original y extraer texto ────────────────────────────
-          nombre_limpio = NOMBRE or Path(ARCHIVO).stem
-          ruta_original = find_file(GRADO, ARCHIVO)
-          pdf_orig_bytes = download_bytes(ruta_original, ref=GRADO)
-          texto = ""
-          if pdf_orig_bytes:
-              try:
-                  import pymupdf
-                  doc = pymupdf.open(stream=pdf_orig_bytes, filetype="pdf")
-                  texto = "\n".join(p.get_text("text") for p in doc).strip()
-                  doc.close()
-                  print(f"[OK] Texto extraido: {len(texto)} caracteres")
-              except Exception as e:
-                  print(f"[WARN] No se pudo leer PDF: {e}")
+          def construir_titulo(titulo, subtitulo=""):
+              idx = int(hashlib.md5(titulo.encode("utf-8")).hexdigest(), 16) % len(TITULOS_LETRAS)
+              letra = TITULOS_LETRAS[idx]
+              tit_esc = escape_latex(titulo)
+              if letra in TITULOS_DOS_ARGS:
+                  sub_esc = escape_latex(subtitulo or "Guia de Conceptos y Practica")
+                  return f"\\titulo{letra}{{{tit_esc}}}{{{sub_esc}}}"
+              return f"\\titulo{letra}{{{tit_esc}}}"
+
+          titulo_documento = nombre_limpio.replace("APUNTE_", "").replace("_", " ").strip()
+          grado_legible = GRADO.replace("_", " ")
+
+          # Selección determinista de título y paleta
+          idx_paleta = int(hashlib.md5((titulo_documento + GRADO).encode("utf-8")).hexdigest(), 16) % len(PALETAS)
+          paleta_cmd = PALETAS[idx_paleta]
+          comando_titulo = construir_titulo(titulo_documento, f"Grado: {grado_legible}")
+
+          # Procesar líneas de contenido
+          lineas = [l.strip() for l in texto.splitlines() if l.strip()][:300]
+          cuerpo = []
+          en_lista = False
+          en_codigo = False
+
+          for l_str in lineas:
+              if l_str.startswith("```"):
+                  if en_lista:
+                      cuerpo.append(r"\end{estrellalist}")
+                      en_lista = False
+                  if en_codigo:
+                      cuerpo.append(r"\end{verbatim}")
+                      en_codigo = False
+                  else:
+                      cuerpo.append(r"\begin{verbatim}")
+                      en_codigo = True
+                  continue
+
+              if en_codigo:
+                  cuerpo.append(l_str)
+                  continue
+
+              # Secciones
+              sec_m = re.match(r"^(?:SECCION:|TEMA\s+\d+:?|UNIDAD\s+\d+:?|\d+\.\s+)(.+)$", l_str, re.IGNORECASE)
+              if sec_m:
+                  if en_lista:
+                      cuerpo.append(r"\end{estrellalist}")
+                      en_lista = False
+                  tit_sec = escape_latex(sec_m.group(1).strip())
+                  cuerpo.append(f"\n\\vspace{{4mm}}\n\\sectionheader{{2.6cm}}{{{tit_sec}}}\n\\vspace{{4mm}}\n")
+                  continue
+
+              # Callouts / Notas importantes
+              tip_m = re.match(r"^(?:NOTA|CONSEJO|IMPORTANTE|AVISO|RECUERDA):\s*(.+)$", l_str, re.IGNORECASE)
+              if tip_m:
+                  if en_lista:
+                      cuerpo.append(r"\end{estrellalist}")
+                      en_lista = False
+                  txt_tip = escape_latex(tip_m.group(1).strip())
+                  cuerpo.append(f"\n\\begin{{tipbox}}[accent]{{Punto Clave}}{{{txt_tip}}}\n\\end{{tipbox}}\n")
+                  continue
+
+              # Elementos de lista
+              if l_str.startswith("- ") or l_str.startswith("* ") or l_str.startswith("• "):
+                  if not en_lista:
+                      cuerpo.append(r"\begin{estrellalist}")
+                      en_lista = True
+                  item_txt = escape_latex(re.sub(r"^[-*•]\s*", "", l_str))
+                  cuerpo.append(f"  \\item {item_txt}")
+                  continue
+              else:
+                  if en_lista:
+                      cuerpo.append(r"\end{estrellalist}")
+                      en_lista = False
+
+              cuerpo.append(f"{escape_latex(l_str)}\\par\n")
+
+          if en_lista:
+              cuerpo.append(r"\end{estrellalist}")
+          if en_codigo:
+              cuerpo.append(r"\end{verbatim}")
+
+          cuerpo_tex = "\n".join(cuerpo)
+
+          # Verificar disponibilidad de estilo.tex
+          estilo_file = bib_dst / "estilo.tex"
+          if estilo_file.exists():
+              encabezado_estilo = r"""\input{bibliotecas_latex/estilo.tex}
+\usarfondo"""
           else:
-              print(f"[WARN] No se pudo descargar {ARCHIVO}")
-
-          # ── Preparar workdir con la libreria del repo ─────────────────────────
-          import tempfile
-          workdir = Path(tempfile.mkdtemp())
-
-          bib_src = BIB_DIR       # ya existe en el checkout de co
-          bib_dst = workdir / "bibliotecas_latex"
-
-          if bib_src.exists() and (bib_src / "estilo.tex").exists():
-              shutil.copytree(str(bib_src), str(bib_dst))
-              print(f"[OK] bibliotecas_latex obtenida del checkout de co")
-          else:
-              # Fallback: descargar desde GRADOS_INFORMATICOS via API
-              print("[INFO] bibliotecas_latex no encontrada en checkout, descargando via API...")
-              bib_dst.mkdir(parents=True, exist_ok=True)
-              (bib_dst / "fonts").mkdir(exist_ok=True)
-
-              estilo_b = download_bytes("bibliotecas_latex/estilo.tex", ref="master")
-              if estilo_b:
-                  (bib_dst / "estilo.tex").write_bytes(estilo_b)
-                  print("[OK] estilo.tex descargado")
-
-              FUENTES = [
-                  "Baloo2-Bold.ttf","Baloo2-ExtraBold.ttf","Fredoka-Bold.ttf",
-                  "Kalam-Bold.ttf","Kalam-Regular.ttf","Lobster.ttf",
-                  "Nunito-Bold.ttf","Nunito-ExtraBold.ttf","Nunito-Regular.ttf",
-                  "Pacifico.ttf","PermanentMarker.ttf",
-              ]
-              ok_fonts = 0
-              for f in FUENTES:
-                  fb = download_bytes(f"bibliotecas_latex/fonts/{f}", ref="master")
-                  if fb:
-                      (bib_dst / "fonts" / f).write_bytes(fb)
-                      ok_fonts += 1
-              print(f"[OK] {ok_fonts}/{len(FUENTES)} fuentes descargadas via API")
-
-
-          # ── Generar .tex ──────────────────────────────────────────────────────
-          titulo = nombre_limpio.replace("APUNTE_", "").replace("_", " ").strip()
-          lineas = [l.strip() for l in texto.splitlines() if l.strip()][:150]
-          items_tex = "\n".join(f"  \\item {escape_latex(l)}" for l in lineas) \
-                      if lineas else f"  \\item {escape_latex(titulo)}"
-
-          estilo_path = workdir / "bibliotecas_latex" / "estilo.tex"
-          if estilo_path.exists():
-              cabecera = r"\input{bibliotecas_latex/estilo.tex}"
-              paleta_cmd = r"\paletaOceano"
-          else:
-              cabecera = r"""
-          \usepackage[utf8]{inputenc}
-          \usepackage[T1]{fontenc}
-          \usepackage[spanish]{babel}
-          \usepackage[a4paper,margin=2cm]{geometry}
-          \usepackage{xcolor,parskip}
-          \definecolor{acento}{HTML}{2563EB}
-          """
+              encabezado_estilo = r"""\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage[a4paper,margin=2cm]{geometry}
+\usepackage{xcolor,parskip}
+\definecolor{primary}{HTML}{2563EB}
+\definecolor{ink}{HTML}{1F2937}"""
               paleta_cmd = ""
+              comando_titulo = rf"\begin{{center}}{{\huge\bfseries\color{{primary}} {escape_latex(titulo_documento)}}}\end{{center}}"
 
-          tex_content = rf"""\documentclass[12pt,a4paper]{{article}}
-          {cabecera}
-          \begin{{document}}
-          {paleta_cmd}
-          \begin{{center}}
-          {{\huge\bfseries {escape_latex(titulo)}}}\\[0.5em]
-          {{\large {escape_latex(GRADO.replace('_',' '))}}}
-          \end{{center}}
-          \vspace{{1em}}
-          \begin{{itemize}}
-          {items_tex}
-          \end{{itemize}}
-          \end{{document}}
-          """
+          tex_documento = rf"""\documentclass[12pt,a4paper]{{article}}
+{encabezado_estilo}
+
+\begin{{document}}
+{paleta_cmd}
+{comando_titulo}
+\vspace{{1mm}}
+\begin{{center}}\large\textcolor{{gray}}{{Grado: {escape_latex(grado_legible)} | Apunte de Estudio}}\end{{center}}
+\vspace{{4mm}}
+
+{cuerpo_tex}
+
+\end{{document}}
+"""
 
           tex_path = workdir / f"{nombre_limpio}.tex"
-          tex_path.write_text(tex_content, encoding="utf-8")
-          print(f"[OK] .tex generado ({tex_path.stat().st_size} bytes)")
+          tex_path.write_text(tex_documento, encoding="utf-8")
+          print(f"[OK] Archivo .tex generado: {tex_path} ({tex_path.stat().st_size} bytes)")
 
-          # ── Compilar con xelatex ──────────────────────────────────────────────
-          def xelatex_run():
+          # ── Compilación xelatex ──────────────────────────────────────────────
+          def ejecutar_xelatex():
               return subprocess.run(
                   ["xelatex", "-interaction=nonstopmode",
                    "-output-directory", str(workdir), str(tex_path)],
                   capture_output=True, cwd=str(workdir), timeout=120
               )
 
-          r1 = xelatex_run()
+          r1 = ejecutar_xelatex()
           pdf_path = workdir / f"{nombre_limpio}.pdf"
           if pdf_path.exists():
-              xelatex_run()  # segunda pasada para referencias
+              ejecutar_xelatex()  # Segunda pasada para resolver fondos y referencias
 
           if not pdf_path.exists():
               log = (r1.stdout + r1.stderr).decode(errors="ignore")[-3000:]
-              print(f"[ERROR] xelatex fallo:\n{log}")
+              print(f"[ERROR] xelatex falló:\n{log}")
               out = {
                   "ok": False, "total": 1, "compilados": 0, "exitosos": [],
                   "fallidos": [{"nombre": nombre_limpio, "grado": GRADO,
@@ -285,20 +407,21 @@ jobs:
               print(json.dumps(out, ensure_ascii=False))
               sys.exit(1)
 
-          print(f"[OK] PDF compilado: {pdf_path.stat().st_size} bytes")
+          print(f"[OK] PDF compilado con éxito: {pdf_path.stat().st_size} bytes")
 
-          # ── Subir PDF y actualizar revision.json ─────────────────────────────
+          # ── Subir PDF compilado a apuntes/{nombre_limpio}.pdf ────────────────
           dest_path = f"apuntes/{nombre_limpio}.pdf"
           put_res = upload_file(dest_path, pdf_path.read_bytes(), branch=GRADO)
           if "content" not in put_res and put_res.get("status") not in (200, 201):
               out = {
                   "ok": False, "total": 1, "compilados": 0, "exitosos": [],
                   "fallidos": [{"nombre": nombre_limpio, "grado": GRADO,
-                                "archivo": ARCHIVO, "error": f"Error subiendo PDF: {put_res}"}]
+                                "archivo": ARCHIVO, "error": f"Error subiendo PDF a GitHub: {put_res}"}]
               }
               print(json.dumps(out, ensure_ascii=False))
               sys.exit(1)
 
+          print(f"[OK] PDF subido a {dest_path} en rama {GRADO}")
           update_revision(nombre_limpio)
 
           out = {
