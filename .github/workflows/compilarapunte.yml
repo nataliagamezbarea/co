@@ -53,8 +53,8 @@ jobs:
           pip install pymupdf --quiet
           fc-cache -f
 
-          - name: Compilar apunte LaTeX con titulos y estilo de bibliotecas_latex
-          env:
+      - name: Compilar apunte LaTeX con titulos y estilo de bibliotecas_latex
+        env:
           GH_TOKEN_GENERAL: ${{ github.event.inputs.gh_token || secrets.GH_TOKEN_GENERAL || secrets.GITHUB_TOKEN }}
           GH_REPO_GENERAL: ${{ github.event.inputs.repo_general }}
           INPUT_GRADO: ${{ github.event.inputs.grado }}
