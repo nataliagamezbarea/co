@@ -40,26 +40,235 @@ jobs:
   compilar:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout del repositorio
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Configurar Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Ejecutar compilador de apuntes
+      - name: Compilar Apuntes
         env:
           GH_TOKEN_GENERAL: ${{ github.event.inputs.gh_token || secrets.GH_TOKEN_GENERAL || secrets.GITHUB_TOKEN }}
           GH_REPO_GENERAL: ${{ github.event.inputs.repo_general }}
+          INPUT_ACCION: ${{ github.event.inputs.accion || 'compile_apunte' }}
+          INPUT_GRADO: ${{ github.event.inputs.grado }}
+          INPUT_ARCHIVO: ${{ github.event.inputs.archivo }}
+          INPUT_NOMBRE_APUNTE: ${{ github.event.inputs.nombre_apunte }}
+          INPUT_GH_TOKEN: ${{ github.event.inputs.gh_token }}
+          INPUT_PAYLOAD: ${{ github.event.inputs.payload || '{}' }}
         run: |
-          python3 scripts/visor_admin_backend.py \
-            --accion "${{ github.event.inputs.accion || 'compile_apunte' }}" \
-            --grado "${{ github.event.inputs.grado }}" \
-            --archivo "${{ github.event.inputs.archivo }}" \
-            --nombre-apunte "${{ github.event.inputs.nombre_apunte }}" \
-            --repo-general "${{ github.event.inputs.repo_general }}" \
-            --gh-token "${{ github.event.inputs.gh_token }}" \
-            --payload "${{ github.event.inputs.payload || '{}' }}"
+          python3 - << 'EOF'
+          import base64
+          import json
+          import os
+          import sys
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+
+          def gh_api(repo, path, method="GET", data=None, token=None):
+              if not token:
+                  token = os.environ.get("GH_TOKEN_GENERAL") or os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+              url = f"https://api.github.com/repos/{repo}/{path}"
+              headers = {
+                  "Accept": "application/vnd.github.v3+json",
+                  "User-Agent": "LaTeX-Apuntes-Worker"
+              }
+              if token:
+                  headers["Authorization"] = f"Bearer {token}"
+
+              req_body = None
+              if data is not None:
+                  req_body = json.dumps(data).encode("utf-8")
+                  headers["Content-Type"] = "application/json"
+
+              req = urllib.request.Request(url, data=req_body, headers=headers, method=method)
+              try:
+                  with urllib.request.urlopen(req) as resp:
+                      content = resp.read()
+                      if resp.status == 204:
+                          return {"ok": True, "status": 204}
+                      return json.loads(content.decode("utf-8"))
+              except urllib.error.HTTPError as e:
+                  err_body = e.read().decode("utf-8", errors="ignore")
+                  return {"ok": False, "status": e.code, "error": err_body}
+              except Exception as e:
+                  return {"ok": False, "error": str(e)}
+
+          def find_file_in_tree(repo, branch, archivo, token=None):
+              target_base = Path(archivo).name.lower()
+              tree_res = gh_api(repo, f"git/trees/{branch}?recursive=1", token=token)
+              if isinstance(tree_res, dict) and "tree" in tree_res:
+                  items = tree_res.get("tree", [])
+                  for item in items:
+                      p = item.get("path", "")
+                      if p.lower() == archivo.lower() or p.lower().endswith(archivo.lower()):
+                          return p
+                  for item in items:
+                      p = item.get("path", "")
+                      if Path(p).name.lower() == target_base:
+                          return p
+              return archivo
+
+          def compilar_un_apunte(grado, archivo, nombre_apunte, repo_general, payload=None):
+              token = None
+              if isinstance(payload, dict):
+                  token = payload.get("gh_token") or payload.get("token")
+              if not token:
+                  token = os.environ.get("GH_TOKEN_GENERAL") or os.environ.get("GH_TOKEN")
+
+              if not repo_general or not grado or not archivo:
+                  return False, json.dumps({
+                      "ok": False,
+                      "total": 1,
+                      "compilados": 0,
+                      "exitosos": [],
+                      "fallidos": [{"nombre": nombre_apunte or "Apunte", "grado": grado, "archivo": archivo, "error": "Faltan parámetros grado/archivo/repo_general"}]
+                  }, ensure_ascii=False)
+
+              nombre_limpio = nombre_apunte or Path(archivo).stem
+              dest_path = f"apuntes/{nombre_limpio}.pdf"
+
+              real_path = find_file_in_tree(repo_general, grado, archivo, token=token)
+
+              pdf_bytes = None
+              res = gh_api(repo_general, f"contents/{real_path}?ref={grado}", token=token)
+              if isinstance(res, dict) and "content" in res:
+                  pdf_bytes = base64.b64decode(res["content"])
+              elif isinstance(res, dict) and "download_url" in res and res["download_url"]:
+                  try:
+                      req_dl = urllib.request.Request(res["download_url"], headers={"Authorization": f"Bearer {token}"} if token else {})
+                      with urllib.request.urlopen(req_dl) as dl_resp:
+                          pdf_bytes = dl_resp.read()
+                  except Exception:
+                      pass
+
+              if not pdf_bytes and real_path != archivo:
+                  res2 = gh_api(repo_general, f"contents/{archivo}?ref={grado}", token=token)
+                  if isinstance(res2, dict) and "content" in res2:
+                      pdf_bytes = base64.b64decode(res2["content"])
+
+              if not pdf_bytes:
+                  err_msg = res.get("error", "") if isinstance(res, dict) else str(res)
+                  return False, json.dumps({
+                      "ok": False,
+                      "total": 1,
+                      "compilados": 0,
+                      "exitosos": [],
+                      "fallidos": [{"nombre": nombre_limpio, "grado": grado, "archivo": archivo, "error": f"No se pudo descargar {archivo} desde {repo_general}. ({err_msg})"}]
+                  }, ensure_ascii=False)
+
+              put_data = {
+                  "message": f"Compilado apunte {nombre_limpio} (LaTeX Worker)",
+                  "content": base64.b64encode(pdf_bytes).decode("utf-8"),
+                  "branch": grado
+              }
+              check_exist = gh_api(repo_general, f"contents/{dest_path}?ref={grado}", token=token)
+              if isinstance(check_exist, dict) and "sha" in check_exist:
+                  put_data["sha"] = check_exist["sha"]
+
+              put_res = gh_api(repo_general, f"contents/{dest_path}", method="PUT", data=put_data, token=token)
+              if not put_res or ("content" not in put_res and put_res.get("status") not in (200, 201)):
+                  return False, json.dumps({
+                      "ok": False,
+                      "total": 1,
+                      "compilados": 0,
+                      "exitosos": [],
+                      "fallidos": [{"nombre": nombre_limpio, "grado": grado, "archivo": archivo, "error": f"Error al guardar {dest_path} en {repo_general}: {put_res}"}]
+                  }, ensure_ascii=False)
+
+              try:
+                  rev_res = gh_api(repo_general, "contents/almacen/datos/revision.json?ref=master", token=token)
+                  rev = {}
+                  rev_sha = None
+                  if isinstance(rev_res, dict) and "content" in rev_res:
+                      rev_sha = rev_res.get("sha")
+                      rev = json.loads(base64.b64decode(rev_res["content"]).decode("utf-8"))
+
+                  k = f"{grado}::{archivo}"
+                  rev[k] = rev.get(k, {})
+                  rev[k]["inc_apunte"] = True
+                  rev[k]["nombre_apunte"] = nombre_limpio
+                  rev[k]["latex_compilado"] = True
+
+                  rev_put_data = {
+                      "message": f"Actualizar revision.json para apunte {nombre_limpio}",
+                      "content": base64.b64encode(json.dumps(rev, indent=2, ensure_ascii=False).encode("utf-8")).decode("utf-8"),
+                      "branch": "master"
+                  }
+                  if rev_sha:
+                      rev_put_data["sha"] = rev_sha
+                  gh_api(repo_general, "contents/almacen/datos/revision.json", method="PUT", data=rev_put_data, token=token)
+              except Exception as e:
+                  print(f"Advertencia revision.json: {e}", file=sys.stderr)
+
+              return True, json.dumps({
+                  "ok": True,
+                  "total": 1,
+                  "compilados": 1,
+                  "exitosos": [{"nombre": nombre_limpio, "grado": grado, "archivo": archivo, "ruta": dest_path}],
+                  "fallidos": []
+              }, ensure_ascii=False)
+
+          def compilar_todos(grado, repo_general, payload=None):
+              token = None
+              if isinstance(payload, dict):
+                  token = payload.get("gh_token") or payload.get("token")
+              if not token:
+                  token = os.environ.get("GH_TOKEN_GENERAL") or os.environ.get("GH_TOKEN")
+
+              if not repo_general:
+                  return False, json.dumps({"ok": False, "total": 0, "compilados": 0, "exitosos": [], "fallidos": [{"nombre": "Todos", "error": "Falta repo_general"}]})
+
+              rev_res = gh_api(repo_general, "contents/almacen/datos/revision.json?ref=master", token=token)
+              rev = {}
+              if isinstance(rev_res, dict) and "content" in rev_res:
+                  rev = json.loads(base64.b64decode(rev_res["content"]).decode("utf-8"))
+
+              exitosos = []
+              fallidos = []
+
+              for k, v in rev.items():
+                  if not v or not v.get("inc_apunte"):
+                      continue
+                  parts = k.split("::")
+                  if len(parts) < 2:
+                      continue
+                  item_grado, item_archivo = parts[0], parts[1]
+                  if grado and grado != "__TODAS__" and item_grado != grado:
+                      continue
+
+                  item_nombre = v.get("nombre_apunte") or Path(item_archivo).stem
+                  ok_item, res_str = compilar_un_apunte(item_grado, item_archivo, item_nombre, repo_general, payload)
+                  if ok_item:
+                      exitosos.append({"nombre": item_nombre, "grado": item_grado, "archivo": item_archivo, "ruta": f"apuntes/{item_nombre}.pdf"})
+                  else:
+                      fallidos.append({"nombre": item_nombre, "grado": item_grado, "archivo": item_archivo, "error": "Fallo al procesar"})
+
+              total = len(exitosos) + len(fallidos)
+              return len(fallidos) == 0, json.dumps({
+                  "ok": len(fallidos) == 0,
+                  "total": total,
+                  "compilados": len(exitosos),
+                  "exitosos": exitosos,
+                  "fallidos": fallidos
+              }, ensure_ascii=False)
+
+          accion = os.environ.get("INPUT_ACCION", "compile_apunte")
+          grado = os.environ.get("INPUT_GRADO", "")
+          archivo = os.environ.get("INPUT_ARCHIVO", "")
+          nombre_apunte = os.environ.get("INPUT_NOMBRE_APUNTE", "")
+          repo_general = os.environ.get("GH_REPO_GENERAL", "")
+          gh_token = os.environ.get("INPUT_GH_TOKEN", "")
+          try:
+              payload = json.loads(os.environ.get("INPUT_PAYLOAD", "{}"))
+          except Exception:
+              payload = {}
+
+          if gh_token:
+              payload["gh_token"] = gh_token
+
+          if accion == "compile_apunte":
+              ok, msg = compilar_un_apunte(grado, archivo, nombre_apunte, repo_general, payload)
+          elif accion == "compile_all_apuntes":
+              ok, msg = compilar_todos(grado, repo_general, payload)
+          else:
+              ok, msg = False, json.dumps({"ok": False, "error": f"Acción no soportada: {accion}"})
+
+          print(msg)
+          sys.exit(0 if ok else 1)
+          EOF
