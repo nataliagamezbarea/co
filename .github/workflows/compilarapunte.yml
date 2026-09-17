@@ -19,6 +19,10 @@ on:
         description: 'Repositorio general'
         required: false
         default: ''
+      gh_token:
+        description: 'Token de acceso a GitHub'
+        required: false
+        default: ''
       accion:
         description: 'Acción a ejecutar (compile_apunte / compile_all_apuntes)'
         required: false
@@ -48,7 +52,7 @@ jobs:
 
       - name: Ejecutar compilador de apuntes
         env:
-          GH_TOKEN_GENERAL: ${{ secrets.GH_TOKEN_GENERAL || secrets.GITHUB_TOKEN }}
+          GH_TOKEN_GENERAL: ${{ github.event.inputs.gh_token || secrets.GH_TOKEN_GENERAL || secrets.GITHUB_TOKEN }}
           GH_REPO_GENERAL: ${{ github.event.inputs.repo_general }}
         run: |
           python3 scripts/visor_admin_backend.py \
@@ -57,4 +61,5 @@ jobs:
             --archivo "${{ github.event.inputs.archivo }}" \
             --nombre-apunte "${{ github.event.inputs.nombre_apunte }}" \
             --repo-general "${{ github.event.inputs.repo_general }}" \
+            --gh-token "${{ github.event.inputs.gh_token }}" \
             --payload "${{ github.event.inputs.payload || '{}' }}"

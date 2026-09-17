@@ -220,6 +220,7 @@ def main():
     p.add_argument("--archivo", default="")
     p.add_argument("--nombre-apunte", default="")
     p.add_argument("--repo-general", default="")
+    p.add_argument("--gh-token", default="")
     p.add_argument("--payload", default="{}")
     a = p.parse_args()
 
@@ -227,6 +228,11 @@ def main():
         a.payload = json.loads(a.payload)
     except Exception:
         a.payload = {}
+
+    if a.gh_token:
+        a.payload["gh_token"] = a.gh_token
+        if not os.environ.get("GH_TOKEN_GENERAL"):
+            os.environ["GH_TOKEN_GENERAL"] = a.gh_token
 
     ok, msg = run(a)
     print(msg)
