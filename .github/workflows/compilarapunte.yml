@@ -1,0 +1,60 @@
+name: Compilar Apuntes LaTeX
+
+on:
+  workflow_dispatch:
+    inputs:
+      grado:
+        description: 'Nombre del grado o rama'
+        required: false
+        default: ''
+      archivo:
+        description: 'Nombre del archivo original'
+        required: false
+        default: ''
+      nombre_apunte:
+        description: 'Nombre del apunte compilado'
+        required: false
+        default: ''
+      repo_general:
+        description: 'Repositorio general'
+        required: false
+        default: ''
+      accion:
+        description: 'Acción a ejecutar (compile_apunte / compile_all_apuntes)'
+        required: false
+        default: 'compile_apunte'
+      payload:
+        description: 'Payload JSON adicional'
+        required: false
+        default: '{}'
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  compilar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Ejecutar compilador de apuntes
+        env:
+          GH_TOKEN_GENERAL: ${{ secrets.GH_TOKEN_GENERAL || secrets.GITHUB_TOKEN }}
+          GH_REPO_GENERAL: ${{ github.event.inputs.repo_general }}
+        run: |
+          python3 scripts/visor_admin_backend.py \
+            --accion "${{ github.event.inputs.accion || 'compile_apunte' }}" \
+            --grado "${{ github.event.inputs.grado }}" \
+            --archivo "${{ github.event.inputs.archivo }}" \
+            --nombre-apunte "${{ github.event.inputs.nombre_apunte }}" \
+            --repo-general "${{ github.event.inputs.repo_general }}" \
+            --payload "${{ github.event.inputs.payload || '{}' }}"
