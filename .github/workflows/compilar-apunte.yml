@@ -262,7 +262,7 @@ jobs:
               "LAVANDA": r"\paletaLavanda"
           }
           PALETAS = [r"\paletaOceano", r"\paletaBosque", r"\paletaCoral", r"\paletaLavanda"]
-          VINETAS = ["estrellalist", "bulletlist", "flechalist", "marcalist"]
+          VINETAS = ["estrellalist", "bulletlist", "flechalist", "marcalist", "tarealist", "alertalist", "preguntalist"]
 
           def escape_latex(s):
               reps = [
@@ -314,13 +314,13 @@ jobs:
                   in_meta = False
               body_lines.append(l_s)
 
-          # Paleta
+          # Paleta aleatoria o personalizada
           if paleta_txt and paleta_txt in PALETAS_MAP:
               paleta_cmd = PALETAS_MAP[paleta_txt]
           else:
               paleta_cmd = random.choice(PALETAS)
 
-          # Estilo de título
+          # Estilo de título aleatorio o personalizado
           if estilo_txt and estilo_txt in TITULOS_LETRAS:
               letra = estilo_txt
           elif subtitulo_txt:
@@ -337,7 +337,14 @@ jobs:
           else:
               comando_titulo = f"\\titulo{letra}{{{tit_esc}}}"
               if subtitulo_txt:
-                  bloque_subtitulo = f"\n\\vspace{{1mm}}\n\\begin{{center}}\\large\\textcolor{{gray}}{{{sub_esc}}}\\end{{center}}\n\\vspace{{4mm}}\n"
+                  # Estilo de subtítulo aleatorio
+                  estilos_sub = [
+                      f"\n\\vspace{{1mm}}\n\\begin{{center}}\\large\\textcolor{{gray}}{{{sub_esc}}}\\end{{center}}\n\\vspace{{4mm}}\n",
+                      f"\n\\vspace{{1mm}}\n\\begin{{center}}\\textcolor{{primary}}{{\\rule{{2.2cm}}{{0.8pt}}}}\\hspace{{4mm}}{{\\large\\headingfont\\color{{ink}} {sub_esc}}}\\hspace{{4mm}}\\textcolor{{primary}}{{\\rule{{2.2cm}}{{0.8pt}}}}\\end{{center}}\n\\vspace{{4mm}}\n",
+                      f"\n\\vspace{{1mm}}\n\\begin{{center}}\\pill[secondary]{{{sub_esc}}}\\end{{center}}\n\\vspace{{4mm}}\n",
+                      f"\n\\vspace{{1mm}}\n\\begin{{center}}\\large\\itshape\\textcolor{{primary}}{{---~{sub_esc}~---}}\\end{{center}}\n\\vspace{{4mm}}\n"
+                  ]
+                  bloque_subtitulo = random.choice(estilos_sub)
               else:
                   bloque_subtitulo = ""
 
@@ -370,14 +377,15 @@ jobs:
                   cuerpo.append(l_str)
                   continue
 
-              # Sección principal
+              # Sección principal con anchura de barra aleatoria
               sec_m = re.match(r"^(?:SECCION:|TEMA\s+\d+:?|UNIDAD\s+\d+:?|\d+\.\s+)(.+)$", l_str, re.IGNORECASE)
               if sec_m:
                   if en_lista:
                       cuerpo.append(rf"\end{{{vineta_actual}}}")
                       en_lista = False
                   tit_sec = format_inline(sec_m.group(1).strip())
-                  cuerpo.append(f"\n\\vspace{{4mm}}\n\\sectionheader{{2.6cm}}{{{tit_sec}}}\n\\vspace{{4mm}}\n")
+                  bar_w = random.choice(["2.0cm", "2.6cm", "3.2cm"])
+                  cuerpo.append(f"\n\\vspace{{4mm}}\n\\sectionheader{{{bar_w}}}{{{tit_sec}}}\n\\vspace{{4mm}}\n")
                   continue
 
               # Subsección
@@ -390,13 +398,14 @@ jobs:
                   cuerpo.append(f"\n\\vspace{{3mm}}\n\\noindent{{\\headingfontxb\\fontsize{{13}}{{16}}\\selectfont\\color{{primary}} {tit_sub}}}\\par\\vspace{{2mm}}\n")
                   continue
 
-              # Callouts y cajas temáticas
+              # Callouts y cajas temáticas con estilo aleatorio
               imp_m = re.match(r"^(?:IMPORTANTE|AVISO|ALERTA):\s*(.+)$", l_str, re.IGNORECASE)
               if imp_m:
                   if en_lista:
                       cuerpo.append(rf"\end{{{vineta_actual}}}")
                       en_lista = False
-                  cuerpo.append(f"\n\\begin{{tipbox}}[accent]{{Importante}}{{{format_inline(imp_m.group(1).strip())}}}\n\\end{{tipbox}}\n")
+                  col_imp = random.choice(["accent", "primary", "secondary"])
+                  cuerpo.append(f"\n\\begin{{tipbox}}[{col_imp}]{{Importante}}{{{format_inline(imp_m.group(1).strip())}}}\n\\end{{tipbox}}\n")
                   continue
 
               con_m = re.match(r"^(?:CONSEJO|TIP|RECUERDA):\s*(.+)$", l_str, re.IGNORECASE)
@@ -412,7 +421,11 @@ jobs:
                   if en_lista:
                       cuerpo.append(rf"\end{{{vineta_actual}}}")
                       en_lista = False
-                  cuerpo.append(f"\n\\infobox{{\\textbf{{Nota: }} {format_inline(nota_m.group(1).strip())}}}\n")
+                  caja_nota = random.choice(["infobox", "highlightpar"])
+                  if caja_nota == "infobox":
+                      cuerpo.append(f"\n\\infobox{{\\textbf{{Nota: }} {format_inline(nota_m.group(1).strip())}}}\n")
+                  else:
+                      cuerpo.append(f"\n\\begin{{highlightpar}}[pale]{{\\textbf{{Nota: }} {format_inline(nota_m.group(1).strip())}}}\\end{{highlightpar}}\n")
                   continue
 
               ejem_m = re.match(r"^(?:EJEMPLO|CASO):\s*(.+)$", l_str, re.IGNORECASE)
@@ -431,7 +444,7 @@ jobs:
                   cuerpo.append(f"\n\\begin{{highlightpar}}[pale]{{\\textbf{{Resumen: }} {format_inline(res_m.group(1).strip())}}}\\end{{highlightpar}}\n")
                   continue
 
-              # Elementos de lista
+              # Elementos de lista (viñeta aleatoria por cada lista)
               list_m = re.match(r"^[-*•]\s*(.+)$", l_str)
               if list_m:
                   if not en_lista:
