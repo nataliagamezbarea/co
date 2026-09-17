@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Worker de compilación de apuntes LaTeX para GitHub Actions."""
+"""Worker de compilación de apuntes LaTeX para GitHub Actions y Visor Admin."""
 import argparse
 import base64
 import json
@@ -39,8 +39,31 @@ def gh_api(repo, path, method="GET", data=None, token=None):
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
+def find_file_in_tree(repo, branch, archivo, token=None):
+    """Encuentra la ruta exacta del archivo en el árbol de GitHub."""
+    target_base = Path(archivo).name.lower()
+    tree_res = gh_api(repo, f"git/trees/{branch}?recursive=1", token=token)
+    if isinstance(tree_res, dict) and "tree" in tree_res:
+        items = tree_res.get("tree", [])
+        # 1. Búsqueda exacta por ruta o sufijo
+        for item in items:
+            p = item.get("path", "")
+            if p.lower() == archivo.lower() or p.lower().endswith(archivo.lower()):
+                return p
+        # 2. Búsqueda por nombre de archivo
+        for item in items:
+            p = item.get("path", "")
+            if Path(p).name.lower() == target_base:
+                return p
+    return archivo
+
 def compilar_un_apunte(grado, archivo, nombre_apunte, repo_general, payload=None):
-    token = os.environ.get("GH_TOKEN_GENERAL") or os.environ.get("GH_TOKEN")
+    token = None
+    if isinstance(payload, dict):
+        token = payload.get("gh_token") or payload.get("token")
+    if not token:
+        token = os.environ.get("GH_TOKEN_GENERAL") or os.environ.get("GH_TOKEN")
+
     if not repo_general or not grado or not archivo:
         return False, json.dumps({
             "ok": False,
@@ -53,26 +76,39 @@ def compilar_un_apunte(grado, archivo, nombre_apunte, repo_general, payload=None
     nombre_limpio = nombre_apunte or Path(archivo).stem
     dest_path = f"apuntes/{nombre_limpio}.pdf"
 
-    # 1. Obtener archivo original desde repo_general
-    res = gh_api(repo_general, f"contents/{archivo}?ref={grado}", token=token)
+    # 1. Encontrar la ruta real del archivo en la rama del grado
+    real_path = find_file_in_tree(repo_general, grado, archivo, token=token)
+
+    # 2. Descargar contenido del archivo
     pdf_bytes = None
+    res = gh_api(repo_general, f"contents/{real_path}?ref={grado}", token=token)
     if isinstance(res, dict) and "content" in res:
         pdf_bytes = base64.b64decode(res["content"])
-    else:
-        res_arch = gh_api(repo_general, f"contents/archivos/{archivo}?ref={grado}", token=token)
-        if isinstance(res_arch, dict) and "content" in res_arch:
-            pdf_bytes = base64.b64decode(res_arch["content"])
+    elif isinstance(res, dict) and "download_url" in res and res["download_url"]:
+        try:
+            req_dl = urllib.request.Request(res["download_url"], headers={"Authorization": f"Bearer {token}"} if token else {})
+            with urllib.request.urlopen(req_dl) as dl_resp:
+                pdf_bytes = dl_resp.read()
+        except Exception:
+            pass
+
+    # Si aún no se obtuvo, intentar ruta directa
+    if not pdf_bytes and real_path != archivo:
+        res2 = gh_api(repo_general, f"contents/{archivo}?ref={grado}", token=token)
+        if isinstance(res2, dict) and "content" in res2:
+            pdf_bytes = base64.b64decode(res2["content"])
 
     if not pdf_bytes:
+        err_msg = res.get("error", "") if isinstance(res, dict) else str(res)
         return False, json.dumps({
             "ok": False,
             "total": 1,
             "compilados": 0,
             "exitosos": [],
-            "fallidos": [{"nombre": nombre_limpio, "grado": grado, "archivo": archivo, "error": f"No se pudo descargar {archivo} desde {repo_general}"}]
+            "fallidos": [{"nombre": nombre_limpio, "grado": grado, "archivo": archivo, "error": f"No se pudo descargar {archivo} desde {repo_general}. Verifica permisos del token o ruta. ({err_msg})"}]
         }, ensure_ascii=False)
 
-    # 2. Subir PDF a apuntes/{nombre_limpio}.pdf en la rama del grado
+    # 3. Subir PDF a apuntes/{nombre_limpio}.pdf en la rama del grado
     put_data = {
         "message": f"Compilado apunte {nombre_limpio} (LaTeX Worker)",
         "content": base64.b64encode(pdf_bytes).decode("utf-8"),
@@ -89,10 +125,10 @@ def compilar_un_apunte(grado, archivo, nombre_apunte, repo_general, payload=None
             "total": 1,
             "compilados": 0,
             "exitosos": [],
-            "fallidos": [{"nombre": nombre_limpio, "grado": grado, "archivo": archivo, "error": f"Error al guardar en GitHub: {put_res}"}]
+            "fallidos": [{"nombre": nombre_limpio, "grado": grado, "archivo": archivo, "error": f"Error al guardar {dest_path} en {repo_general}: {put_res}"}]
         }, ensure_ascii=False)
 
-    # 3. Actualizar revision.json en master
+    # 4. Actualizar revision.json en master
     try:
         rev_res = gh_api(repo_general, "contents/almacen/datos/revision.json?ref=master", token=token)
         rev = {}
@@ -127,7 +163,12 @@ def compilar_un_apunte(grado, archivo, nombre_apunte, repo_general, payload=None
     }, ensure_ascii=False)
 
 def compilar_todos(grado, repo_general, payload=None):
-    token = os.environ.get("GH_TOKEN_GENERAL") or os.environ.get("GH_TOKEN")
+    token = None
+    if isinstance(payload, dict):
+        token = payload.get("gh_token") or payload.get("token")
+    if not token:
+        token = os.environ.get("GH_TOKEN_GENERAL") or os.environ.get("GH_TOKEN")
+
     if not repo_general:
         return False, json.dumps({"ok": False, "total": 0, "compilados": 0, "exitosos": [], "fallidos": [{"nombre": "Todos", "error": "Falta repo_general"}]})
 
@@ -150,7 +191,7 @@ def compilar_todos(grado, repo_general, payload=None):
             continue
 
         item_nombre = v.get("nombre_apunte") or Path(item_archivo).stem
-        ok_item, res_str = compilar_un_apunte(item_grado, item_archivo, item_nombre, repo_general)
+        ok_item, res_str = compilar_un_apunte(item_grado, item_archivo, item_nombre, repo_general, payload)
         if ok_item:
             exitosos.append({"nombre": item_nombre, "grado": item_grado, "archivo": item_archivo, "ruta": f"apuntes/{item_nombre}.pdf"})
         else:
